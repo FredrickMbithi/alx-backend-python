@@ -1,36 +1,11 @@
 #!/usr/bin/env python3
-"""Unit tests for utils.access_nested_map
-"""
-
-import unittest
-from parameterized import parameterized
-from utils import access_nested_map
-
-
-class TestAccessNestedMap(unittest.TestCase):
-    """Unit tests for the access_nested_map function"""
-
-    @parameterized.expand([
-        ({"a": 1}, ("a",), 1),
-        ({"a": {"b": 2}}, ("a",), {"b": 2}),
-        ({"a": {"b": 2}}, ("a", "b"), 2),
-    ])
-    def test_access_nested_map(self, nested_map, path, expected):
-        """Test that access_nested_map returns the expected result"""
-        self.assertEqual(access_nested_map(nested_map, path), expected)
-
-
-if __name__ == "__main__":
-    unittest.main()
-
-    #!/usr/bin/env python3
 """Unit tests for utils.py
 """
 
 import unittest
 from unittest.mock import patch, Mock
 from parameterized import parameterized
-from utils import access_nested_map, get_json
+from utils import access_nested_map, get_json, memoize
 
 
 class TestAccessNestedMap(unittest.TestCase):
@@ -44,6 +19,16 @@ class TestAccessNestedMap(unittest.TestCase):
     def test_access_nested_map(self, nested_map, path, expected):
         """Test that access_nested_map returns the expected result"""
         self.assertEqual(access_nested_map(nested_map, path), expected)
+
+    @parameterized.expand([
+        ({}, ("a",), "a"),
+        ({"a": 1}, ("a", "b"), "b")
+    ])
+    def test_access_nested_map_exception(self, nested_map, path, expected_key):
+        """Test that access_nested_map raises KeyError with the correct message"""
+        with self.assertRaises(KeyError) as cm:
+            access_nested_map(nested_map, path)
+        self.assertEqual(str(cm.exception), f"'{expected_key}'")
 
 
 class TestGetJson(unittest.TestCase):
@@ -62,12 +47,6 @@ class TestGetJson(unittest.TestCase):
             result = get_json(test_url)
             mock_get.assert_called_once_with(test_url)
             self.assertEqual(result, test_payload)
-
-
-if __name__ == "__main__":
-    unittest.main()
-
-from utils import memoize
 
 
 class TestMemoize(unittest.TestCase):
@@ -95,3 +74,6 @@ class TestMemoize(unittest.TestCase):
             self.assertEqual(result2, 42)
             mock_method.assert_called_once()
 
+
+if __name__ == "__main__":
+    unittest.main()
