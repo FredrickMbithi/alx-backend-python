@@ -14,7 +14,11 @@ class TestAccessNestedMap(unittest.TestCase):
     @parameterized.expand([
         ({"a": 1}, ("a",), 1),
         ({"a": {"b": 2}}, ("a",), {"b": 2}),
-        ({"a": {"b": 2}}, ("a", "b"), 2),
+        (
+            {"a": {"b": 2}},
+            ("a", "b"),
+            2
+        ),
     ])
     def test_access_nested_map(self, nested_map, path, expected):
         """Test that access_nested_map returns the expected result"""
@@ -56,6 +60,8 @@ class TestMemoize(unittest.TestCase):
         """Test that memoize caches method results"""
 
         class TestClass:
+            """Test class for memoize"""
+
             def a_method(self):
                 return 42
 
@@ -67,7 +73,7 @@ class TestMemoize(unittest.TestCase):
             obj = TestClass()
             # First call should invoke a_method
             result1 = obj.a_property
-            # Second call should return cached value (no new call to a_method)
+            # Second call should return cached value
             result2 = obj.a_property
 
             self.assertEqual(result1, 42)
