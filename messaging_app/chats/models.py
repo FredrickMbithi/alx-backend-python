@@ -2,14 +2,15 @@
 import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser
-from django.conf import settings
 
 class User(AbstractUser):
     """
     Custom User model extending AbstractUser.
+    Uses UUID as primary key and adds extra fields
+    required by the schema.
     """
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    email = models.EmailField(unique=True)
+    user_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, db_index=True)
+    email = models.EmailField(unique=True, null=False)
     phone_number = models.CharField(max_length=20, blank=True, null=True)
 
     ROLE_GUEST = 'guest'
@@ -20,7 +21,8 @@ class User(AbstractUser):
         (ROLE_HOST, 'Host'),
         (ROLE_ADMIN, 'Admin'),
     ]
-    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default=ROLE_GUEST)
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default=ROLE_GUEST, null=False)
+    password_hash = models.CharField(max_length=255, null=True, blank=True)  # Explicit password field
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -28,20 +30,20 @@ class User(AbstractUser):
 
 
 class Conversation(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    participants = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="conversations")
+    conversation_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    participants = models.ManyToManyField(User, related_name='conversations')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Conversation {self.id}"
+        return f"Conversation {self.conversation_id}"
 
 
 class Message(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sent_messages")
-    conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name="messages")
-    content = models.TextField()  # ✅ changed from message_body
-    timestamp = models.DateTimeField(auto_now_add=True)  # ✅ changed from sent_at
+    message_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
+    conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
+    message_body = models.TextField(null=False)
+    sent_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.sender.username}: {self.content[:20]}"
+        return f"Message {self.message_id} from {self.sender}"
