@@ -1,12 +1,11 @@
-from django.shortcuts import render
-
-# Create your views here.
 # chats/views.py
 from rest_framework import viewsets, status
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
-from .models import Conversation, Message, User
-from .serializers import ConversationSerializer, MessageSerializer, UserSerializer
+from django_filters.rest_framework import DjangoFilterBackend
+from .models import User, Conversation, Message
+from .serializers import UserSerializer, ConversationSerializer, MessageSerializer
+
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -17,23 +16,39 @@ class UserViewSet(viewsets.ModelViewSet):
 class ConversationViewSet(viewsets.ModelViewSet):
     queryset = Conversation.objects.all().prefetch_related('participants', 'messages')
     serializer_class = ConversationSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
-        user_id = self.request.query_params.get('user')
-        if user_id:
-            return self.queryset.filter(participants__id=user_id).distinct()
-        return self.queryset
+    # Add filtering support
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['participants']
+
+    def create(self, request, *args, **kwargs):
+        participants_ids = request.data.get('participants', [])
+        if not participants_ids or len(participants_ids) < 2:
+            return Response(
+                {"error": "A conversation must have at least 2 participants."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        conversation = Conversation.objects.create()
+        conversation.participants.set(User.objects.filter(user_id__in=participants_ids))
+        conversation.save()
+        return Response(ConversationSerializer(conversation).data, status=status.HTTP_201_CREATED)
 
 
 class MessageViewSet(viewsets.ModelViewSet):
-    queryset = Message.objects.select_related('sender','conversation').all()
+    queryset = Message.objects.select_related('sender', 'conversation').all()
     serializer_class = MessageSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
+
+    # Add filtering support
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['conversation']
 
     def create(self, request, *args, **kwargs):
-        # delegate to serializer (it needs sender_id in payload)
-        serializer = self.get_serializer(data=request.data)
+        data = request.data.copy()
+        data['sender'] = str(request.user.user_id)
+        serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
-        msg = serializer.save()
-        return Response(MessageSerializer(msg).data, status=status.HTTP_201_CREATED)
+        message = serializer.save()
+        return Response(MessageSerializer(message).data, status=status.HTTP_201_CREATED)
