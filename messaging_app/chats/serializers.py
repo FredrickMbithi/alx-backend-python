@@ -10,6 +10,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 class MessageSerializer(serializers.ModelSerializer):
     sender = UserSerializer(read_only=True)
+    message_body = serializers.CharField()  # explicit CharField declaration
 
     class Meta:
         model = Message
