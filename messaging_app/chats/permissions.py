@@ -1,6 +1,6 @@
 from rest_framework import permissions
 
-class IsOwner(permissions):
+class IsOwner(BasePermissions):
     """
     Custom permission class (not actively used in views).
     """
