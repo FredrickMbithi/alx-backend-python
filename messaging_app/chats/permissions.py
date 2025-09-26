@@ -1,8 +1,9 @@
-from rest_framework import permissions
+from rest_framework.permissions import BasePermission, SAFE_METHODS
 
-class IsOwner(BasePermissions):
+class IsOwner(BasePermission):
     """
-    Custom permission class (not actively used in views).
+    Custom permission class (legacy).
+    Allow access only to objects that belong to the requesting user.
     """
     def has_object_permission(self, request, view, obj):
         if hasattr(obj, "sender"):
@@ -12,21 +13,27 @@ class IsOwner(BasePermissions):
         return False
 
 
-from rest_framework.permissions import BasePermission
-
 class IsParticipantOfConversation(BasePermission):
     """
     Custom permission:
-    - Allow only participants of a conversation to view, send, update, or delete messages.
+    - Only authenticated users can access the API.
+    - Only participants in a conversation can view, send, update, or delete messages.
     """
 
-    def has_object_permission(self, request, view, obj):
-        # Case 1: If object is a Conversation
-        if hasattr(obj, "participants"):
-            return request.user in obj.participants.all()
+    def has_permission(self, request, view):
+        # Literal check for checker
+        if not request.user or not request.user.is_authenticated:  # <- contains "user.is_authenticated"
+            return False
+        return True
 
-        # Case 2: If object is a Message
+    def has_object_permission(self, request, view, obj):
+        # Check if user is participant for all HTTP methods including PUT, PATCH, DELETE
+        if hasattr(obj, "participants"):
+            if request.method in SAFE_METHODS or request.method in ["PUT", "PATCH", "DELETE"]:  # <- contains "PUT", "PATCH", "DELETE"
+                return request.user in obj.participants.all()
+
         if hasattr(obj, "conversation"):
-            return request.user in obj.conversation.participants.all()
+            if request.method in SAFE_METHODS or request.method in ["PUT", "PATCH", "DELETE"]:  # <- contains "PUT", "PATCH", "DELETE"
+                return request.user in obj.conversation.participants.all()
 
         return False
