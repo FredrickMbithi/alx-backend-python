@@ -1,10 +1,10 @@
-# chats/views.py
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import User, Conversation, Message
-from .serializers import UserSerializer, ConversationSerializer, MessageSerializer
+from .permissions import IsOwner
+from .models import Message, Conversation, User
+from .serializers import MessageSerializer, ConversationSerializer, UserSerializer
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -14,13 +14,14 @@ class UserViewSet(viewsets.ModelViewSet):
 
 
 class ConversationViewSet(viewsets.ModelViewSet):
-    queryset = Conversation.objects.all().prefetch_related('participants', 'messages')
     serializer_class = ConversationSerializer
-    permission_classes = [IsAuthenticated]
-
-    # Add filtering support
+    permission_classes = [IsAuthenticated, IsOwner]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['participants']
+
+    def get_queryset(self):
+        # Only return conversations where the logged-in user is a participant
+        return Conversation.objects.filter(participants=self.request.user).prefetch_related('participants', 'messages')
 
     def create(self, request, *args, **kwargs):
         participants_ids = request.data.get('participants', [])
@@ -37,17 +38,18 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
 
 class MessageViewSet(viewsets.ModelViewSet):
-    queryset = Message.objects.select_related('sender', 'conversation').all()
     serializer_class = MessageSerializer
-    permission_classes = [IsAuthenticated]
-
-    # Add filtering support
+    permission_classes = [IsAuthenticated, IsOwner]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['conversation']
 
+    def get_queryset(self):
+        # Only return messages sent by the logged-in user OR in conversations they belong to
+        return Message.objects.filter(conversation__participants=self.request.user)
+
     def create(self, request, *args, **kwargs):
         data = request.data.copy()
-        data['sender'] = str(request.user.user_id)
+        data['sender'] = str(request.user.user_id)  # Force sender = logged in user
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         message = serializer.save()
