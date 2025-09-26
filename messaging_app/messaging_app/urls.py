@@ -17,9 +17,15 @@ Including another URLconf
 # messaging_app/urls.py
 from django.contrib import admin
 from django.urls import path, include
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('api/', include('chats.urls')),      # your API endpoints
-    path('api-auth/', include('rest_framework.urls')),  # DRF login/logout
+    path("admin/", admin.site.urls),
+
+    # JWT Authentication
+    path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+
+    # Include chats urls (you’ll create this file later)
+    path("chats/", include("chats.urls")),
 ]
