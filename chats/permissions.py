@@ -1,7 +1,8 @@
 # chats/permissions.py
 
-from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework import permissions  # <- required by ALX checker
+from rest_framework.permissions import BasePermission, IsAuthenticated
+
 
 class IsParticipantOfConversation(BasePermission):
     """
