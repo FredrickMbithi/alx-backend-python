@@ -1,39 +1,42 @@
-from rest_framework import serializers
-from .models import User, Conversation, Message
+# chats/models.py
 
+from django.db import models
+from django.contrib.auth.models import User
+from django.utils import timezone
 
-class UserSerializer(serializers.ModelSerializer):
+class Conversation(models.Model):
+    """
+    Represents a conversation between multiple users
+    """
+    participants = models.ManyToManyField(User, related_name='conversations')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
     class Meta:
-        model = User
-        fields = ['user_id', 'username', 'email', 'phone_number', 'role', 'created_at']
+        ordering = ['-updated_at']
+    
+    def __str__(self):
+        participant_names = ', '.join([user.username for user in self.participants.all()[:3]])
+        if self.participants.count() > 3:
+            participant_names += '...'
+        return f"Conversation: {participant_names}"
+    
+    @property
+    def last_message(self):
+        """Get the last message in this conversation"""
+        return self.messages.last()
 
-
-class MessageSerializer(serializers.ModelSerializer):
-    sender = UserSerializer(read_only=True)
-    message_body = serializers.CharField()  # explicit CharField declaration
-
+class Message(models.Model):
+    """
+    Represents a message within a conversation
+    """
+    conversation = models.ForeignKey(Conversation, related_name='messages', on_delete=models.CASCADE)
+    sender = models.ForeignKey(User, related_name='sent_messages', on_delete=models.CASCADE)
+    message_body = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    
     class Meta:
-        model = Message
-        fields = ['message_id', 'sender', 'conversation', 'message_body', 'sent_at']
-
-
-class ConversationSerializer(serializers.ModelSerializer):
-    # Nested messages
-    messages = MessageSerializer(many=True, read_only=True)
-    participants = UserSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = Conversation
-        fields = ['conversation_id', 'participants', 'messages', 'created_at']
-
-    # Example: Adding a SerializerMethodField for a custom field
-    total_messages = serializers.SerializerMethodField()
-
-    def get_total_messages(self, obj):
-        return obj.messages.count()
-
-    # Example: Adding validation
-    def validate_participants(self, value):
-        if len(value) < 2:
-            raise serializers.ValidationError("A conversation must have at least 2 participants.")
-        return value
+        ordering = ['timestamp']
+    
+    def __str__(self):
+        return f"{self.sender.username}: {self.message_body[:50]}{'...' if len(self.message_body) > 50 else ''}"
