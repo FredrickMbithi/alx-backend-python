@@ -1,207 +1,184 @@
-# chats/middleware.py
+# messaging_app/settings.py
 
-import logging
-from datetime import datetime
-from django.http import HttpResponseForbidden, JsonResponse
-from django.utils import timezone
-from django.contrib.auth.models import User
-import json
-from collections import defaultdict
-from django.core.cache import cache
-import time
+import os
+from pathlib import Path
+from datetime import timedelta
 
-# Configure logging for request logging
-logging.basicConfig(
-    filename='requests.log',
-    level=logging.INFO,
-    format='%(message)s',
-    filemode='a'
-)
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-logger = logging.getLogger(__name__)
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = 'django-insecure-your-secret-key-change-this-in-production'
 
-class RequestLoggingMiddleware:
-    """
-    Middleware to log each user's requests to a file
-    """
-    
-    def __init__(self, get_response):
-        """
-        Initialize the middleware
-        """
-        self.get_response = get_response
-    
-    def __call__(self, request):
-        """
-        Process the request and log user activity
-        """
-        # Get user info
-        if request.user.is_authenticated:
-            user = request.user.username
-        else:
-            user = "Anonymous"
-        
-        # Create log entry
-        log_message = f"{datetime.now()} - User: {user} - Path: {request.path}"
-        
-        # Log to file
-        logger.info(log_message)
-        
-        # Also log to console for development
-        print(log_message)
-        
-        # Continue processing the request
-        response = self.get_response(request)
-        
-        return response
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = True
 
+ALLOWED_HOSTS = []
 
-class RestrictAccessByTimeMiddleware:
-    """
-    Middleware to restrict chat access during certain hours
-    Only allows access between 6 AM and 9 PM
-    """
+# Application definition
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
     
-    def __init__(self, get_response):
-        self.get_response = get_response
+    # Third party apps
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'django_filters',
     
-    def __call__(self, request):
-        # Check if this is a chat-related request
-        if request.path.startswith('/api/chats/'):
-            current_hour = timezone.now().hour
-            
-            # Block access outside 6 AM (6) to 9 PM (21) hours
-            if current_hour < 6 or current_hour >= 21:
-                return JsonResponse({
-                    'error': 'Chat access is restricted during these hours. Available from 6 AM to 9 PM.',
-                    'current_time': timezone.now().strftime('%H:%M:%S'),
-                    'status': 'forbidden'
-                }, status=403)
-        
-        response = self.get_response(request)
-        return response
+    # Local apps
+    'chats',
+]
 
+# Middleware Configuration
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    
+    # Custom Middleware (Order matters!)
+    'chats.middleware.RequestLoggingMiddleware',        # Log all requests
+    'chats.middleware.RestrictAccessByTimeMiddleware',  # Time-based restrictions
+    'chats.middleware.RolePermissionMiddleware',        # Role-based permissions
+    'chats.middleware.OffensiveLanguageMiddleware',     # Rate limiting
+    
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
 
-class OffensiveLanguageMiddleware:
-    """
-    Middleware to implement rate limiting based on IP address
-    Limits users to 5 messages per minute
-    """
-    
-    def __init__(self, get_response):
-        self.get_response = get_response
-        # Store message counts per IP with timestamps
-        self.message_counts = defaultdict(list)
-        self.rate_limit = 5  # messages per minute
-        self.time_window = 60  # seconds
-    
-    def __call__(self, request):
-        # Only apply to POST requests on message endpoints
-        if (request.method == 'POST' and 
-            request.path.startswith('/api/chats/messages')):
-            
-            # Get client IP address
-            ip_address = self.get_client_ip(request)
-            current_time = time.time()
-            
-            # Clean old entries (older than time window)
-            self.message_counts[ip_address] = [
-                timestamp for timestamp in self.message_counts[ip_address]
-                if current_time - timestamp < self.time_window
-            ]
-            
-            # Check if user has exceeded rate limit
-            if len(self.message_counts[ip_address]) >= self.rate_limit:
-                return JsonResponse({
-                    'error': f'Rate limit exceeded. Maximum {self.rate_limit} messages per minute.',
-                    'retry_after': '60 seconds',
-                    'current_count': len(self.message_counts[ip_address])
-                }, status=429)
-            
-            # Add current timestamp
-            self.message_counts[ip_address].append(current_time)
-        
-        response = self.get_response(request)
-        return response
-    
-    def get_client_ip(self, request):
-        """
-        Get the client's IP address from the request
-        """
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0]
-        else:
-            ip = request.META.get('REMOTE_ADDR')
-        return ip
+ROOT_URLCONF = 'messaging_app.urls'
 
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
 
-class RolePermissionMiddleware:
-    """
-    Middleware to check user roles before allowing access to specific actions
-    Only allows admin and moderator users to access certain endpoints
-    """
+WSGI_APPLICATION = 'messaging_app.wsgi.application'
+
+# Database
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}
+
+# Password validation
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+]
+
+# REST Framework Configuration
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+    ],
+}
+
+# JWT Configuration
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': False,
     
-    def __init__(self, get_response):
-        self.get_response = get_response
-        # Define protected paths that require admin/moderator access
-        self.protected_paths = [
-            '/api/chats/conversations/',  # Creating conversations
-            '/admin/',  # Admin panel
-        ]
-        # Define roles that have access
-        self.allowed_roles = ['admin', 'moderator']
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'VERIFYING_KEY': None,
+    'AUDIENCE': None,
+    'ISSUER': None,
     
-    def __call__(self, request):
-        # Check if the path requires role-based permission and it's a POST request
-        if (request.method == 'POST' and 
-            self.requires_role_permission(request.path)):
-            
-            # Check if user is authenticated
-            if not request.user.is_authenticated:
-                return JsonResponse({
-                    'error': 'Authentication required',
-                    'status': 'unauthorized'
-                }, status=401)
-            
-            # Check if user has required role
-            if not self.user_has_required_role(request.user):
-                return JsonResponse({
-                    'error': 'Access denied. Admin or moderator role required.',
-                    'user_role': self.get_user_role(request.user),
-                    'required_roles': self.allowed_roles
-                }, status=403)
-        
-        response = self.get_response(request)
-        return response
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+    'USER_AUTHENTICATION_RULE': 'rest_framework_simplejwt.authentication.default_user_authentication_rule',
     
-    def requires_role_permission(self, path):
-        """
-        Check if the path requires role-based permissions
-        """
-        # For POST requests to create conversations or access admin
-        return any(path.startswith(protected_path) for protected_path in self.protected_paths)
-    
-    def user_has_required_role(self, user):
-        """
-        Check if user has admin or moderator role
-        """
-        # Check if user is superuser (admin)
-        if user.is_superuser or user.is_staff:
-            return True
-        
-        # Check if user has admin or moderator group
-        user_groups = user.groups.values_list('name', flat=True)
-        return any(role in user_groups for role in self.allowed_roles)
-    
-    def get_user_role(self, user):
-        """
-        Get the user's role for debugging purposes
-        """
-        if user.is_superuser:
-            return 'superuser'
-        elif user.is_staff:
-            return 'staff'
-        else:
-            user_groups = list(user.groups.values_list('name', flat=True))
-            return user_groups[0] if user_groups else 'regular_user'
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_TYPE_CLAIM': 'token_type',
+}
+
+# Internationalization
+LANGUAGE_CODE = 'en-us'
+TIME_ZONE = 'UTC'
+USE_I18N = True
+USE_TZ = True
+
+# Static files (CSS, JavaScript, Images)
+STATIC_URL = 'static/'
+
+# Default primary key field type
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Logging Configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': 'requests.log',
+            'formatter': 'simple',
+        },
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'loggers': {
+        'chats.middleware': {
+            'handlers': ['file', 'console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}
