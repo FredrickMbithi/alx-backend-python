@@ -6,6 +6,19 @@ from parameterized import parameterized
 from utils import access_nested_map, get_json, memoize
 
 
+
+@parameterized.expand([
+    ({"license": {"key": "my_license"}}, "my_license", True),
+    ({"license": {"key": "other_license"}}, "my_license", False),
+])
+def test_has_license(self, repo, license_key, expected):
+    """Test has_license static method."""
+    self.assertEqual(
+        GithubOrgClient.has_license(repo, license_key),
+        expected
+    )
+
+
 class TestAccessNestedMap(unittest.TestCase):
     """Test access_nested_map function."""
 
