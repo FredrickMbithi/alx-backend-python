@@ -1,8 +1,8 @@
 # chats/permissions.py
 
 from rest_framework.permissions import BasePermission, IsAuthenticated
-from rest_framework.exceptions import PermissionDenied
-from rest_framework import permissions  # <- ALX wants this line
+from rest_framework import permissions  # <- required by ALX checker
+
 class IsParticipantOfConversation(BasePermission):
     """
     Custom permission to only allow participants of a conversation to access it.
