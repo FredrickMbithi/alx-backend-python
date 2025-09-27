@@ -1,7 +1,7 @@
 # chats/permissions.py
 
-from rest_framework import permissions  # <- required by ALX checker
-from rest_framework.permissions import BasePermission, IsAuthenticated
+from rest_framework import permissions
+from rest_framework.permissions import BasePermission
 
 
 class IsParticipantOfConversation(BasePermission):
@@ -30,6 +30,7 @@ class IsParticipantOfConversation(BasePermission):
         # Check if user is a participant in the conversation
         return conversation.participants.filter(id=user.id).exists()
 
+
 class IsOwnerOrParticipant(BasePermission):
     """
     Permission to allow message owners to edit/delete their own messages,
@@ -43,7 +44,7 @@ class IsOwnerOrParticipant(BasePermission):
         user = request.user
         
         # For viewing messages, user must be a participant
-        if request.method in ['GET', 'HEAD', 'OPTIONS']:
+        if request.method in permissions.SAFE_METHODS:
             if hasattr(obj, 'conversation'):
                 return obj.conversation.participants.filter(id=user.id).exists()
             return obj.participants.filter(id=user.id).exists()
@@ -58,7 +59,8 @@ class IsOwnerOrParticipant(BasePermission):
         
         return False
 
-class IsAuthenticatedAndParticipant(IsAuthenticated):
+
+class IsAuthenticatedAndParticipant(permissions.IsAuthenticated):
     """
     Combines authentication check with participant check
     """
