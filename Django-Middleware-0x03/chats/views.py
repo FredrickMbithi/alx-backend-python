@@ -7,6 +7,13 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User
+from rest_framework import permissions
+
+class IsOwnerOrParticipant(permissions.BasePermission):
+    def has_object_permission(self, request, view, obj):
+        # Example logic
+        return request.user in obj.participants.all() or obj.owner == request.user
+
 
 from .models import Conversation, Message
 from .serializers import (
