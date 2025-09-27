@@ -6,19 +6,6 @@ from parameterized import parameterized
 from utils import access_nested_map, get_json, memoize
 
 
-
-@parameterized.expand([
-    ({"license": {"key": "my_license"}}, "my_license", True),
-    ({"license": {"key": "other_license"}}, "my_license", False),
-])
-def test_has_license(self, repo, license_key, expected):
-    """Test has_license static method."""
-    self.assertEqual(
-        GithubOrgClient.has_license(repo, license_key),
-        expected
-    )
-
-
 class TestAccessNestedMap(unittest.TestCase):
     """Test access_nested_map function."""
 
@@ -54,9 +41,9 @@ class TestGetJson(unittest.TestCase):
         mock_response = Mock()
         mock_response.json.return_value = test_payload
         mock_get.return_value = mock_response
-        
+
         result = get_json(test_url)
-        
+
         mock_get.assert_called_once_with(test_url)
         self.assertEqual(result, test_payload)
 
@@ -66,7 +53,7 @@ class TestMemoize(unittest.TestCase):
 
     def test_memoize(self):
         """Test that memoize caches method results."""
-        
+
         class TestClass:
             def a_method(self):
                 return 42
@@ -76,16 +63,18 @@ class TestMemoize(unittest.TestCase):
                 return self.a_method()
 
         test_obj = TestClass()
-        
-        with patch.object(test_obj, 'a_method', return_value=42) as mock_method:
+
+        with patch.object(
+            test_obj, 'a_method', return_value=42
+        ) as mock_method:
             # First call
             result1 = test_obj.a_property
-            # Second call  
+            # Second call
             result2 = test_obj.a_property
-            
+
             # Both calls should return the same result
             self.assertEqual(result1, 42)
             self.assertEqual(result2, 42)
-            
+
             # a_method should only be called once due to memoization
             mock_method.assert_called_once()
