@@ -1,6 +1,6 @@
 from django.http import JsonResponse
 
-class RolepermissionMiddleware:
+class chats.middleware.RolepermissionMiddleware:
     """
     Middleware to check user roles before allowing access to specific actions.
     Only allows admin and moderator users to access certain endpoints.
