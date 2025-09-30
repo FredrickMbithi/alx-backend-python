@@ -1,6 +1,8 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render, get_object_or_404
 from .models import Message
+from django.views.decorators.cache import cache_page
+
 
 @login_required
 def delete_user(request):
@@ -44,3 +46,14 @@ def unread_messages_view(request):
         .only('id', 'content', 'sender', 'created_at')  # only fetch necessary fields
 
     return render(request, 'messaging/unread_messages.html', {'messages': unread_messages})
+
+
+# Cache this view for 60 seconds
+@cache_page(60)
+def message_thread_view(request):
+    messages = Message.objects.filter(parent_message__isnull=True) \
+        .select_related('sender') \
+        .prefetch_related('replies__sender') \
+        .only('id', 'content', 'sender', 'parent_message', 'created_at')
+
+    return render(request, 'messaging/threaded_messages.html', {'messages': messages})
