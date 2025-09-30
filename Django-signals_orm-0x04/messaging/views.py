@@ -34,3 +34,13 @@ def send_message_view(request):
         )
 
     return redirect('message_thread')  # adjust to your thread URL
+
+
+# messaging/views.py
+@login_required
+def unread_messages_view(request):
+    unread_messages = Message.unread.unread_for_user(request.user) \
+        .select_related('sender') \
+        .only('id', 'content', 'sender', 'created_at')  # only fetch necessary fields
+
+    return render(request, 'messaging/unread_messages.html', {'messages': unread_messages})
