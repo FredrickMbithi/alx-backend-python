@@ -19,3 +19,19 @@ def message_thread_view(request):
         .prefetch_related('replies__author')
 
     return render(request, 'messaging/threaded_messages.html', {'messages': messages})
+
+
+def send_message_view(request):
+    if request.method == "POST":
+        content = request.POST.get('content')
+        parent_msg_id = request.POST.get('parent_message_id')  # optional reply
+        parent_msg = None
+        if parent_msg_id:
+            parent_msg = Message.objects.get(id=parent_msg_id)
+        
+        Message.objects.create(
+            content=content,
+            author=request.user,        # sender
+            parent_message=parent_msg,  # reply
+            # receiver=receiver_user,   # if you have a receiver field
+        )
