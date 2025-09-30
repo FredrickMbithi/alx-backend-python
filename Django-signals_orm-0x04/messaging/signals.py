@@ -1,18 +1,15 @@
-from django.db.models.signals import post_save, pre_save, post_delete
+from django.db.models.signals import post_delete
 from django.dispatch import receiver
 from django.contrib.auth.models import User
 from .models import Message, Notification, MessageHistory
 
-# ... previous signals ...
-
-@receiver(post_save, sender=Message)
-def create_notification(sender, instance, created, **kwargs):
+@receiver(post_delete, sender=User)
+def delete_user_related_data(sender, instance, **kwargs):
     """
-    Creates a Notification whenever a new Message is saved.
+    Deletes all user-related data when a user is deleted.
     """
-    if created:
-        Notification.objects.create(
-            user=instance.receiver,  # make sure your Notification model has a 'user' field
-            message=instance          # and a 'message' ForeignKey field
-        )
-        print(f"Notification created for message {instance.id} to {instance.receiver}")
+    # Optional if CASCADE already handles this:
+    Message.objects.filter(sender=instance).delete()
+    Message.objects.filter(receiver=instance).delete()
+    Notification.objects.filter(user=instance).delete()
+    MessageHistory.objects.filter(message__sender=instance).delete()
