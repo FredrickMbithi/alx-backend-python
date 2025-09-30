@@ -66,3 +66,17 @@ class MessageHistory(models.Model):
 
     def __str__(self):
         return f"History of message {self.message.id} at {self.edited_at}"
+
+
+class Message(models.Model):
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    
+    # Self-referential for threaded replies
+    parent_message = models.ForeignKey(
+        'self', null=True, blank=True, related_name='replies', on_delete=models.CASCADE
+    )
+
+    edited_by = models.ForeignKey(User, null=True, blank=True, related_name='edited_messages', on_delete=models.SET_NULL)
