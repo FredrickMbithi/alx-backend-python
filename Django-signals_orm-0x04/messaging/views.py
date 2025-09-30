@@ -1,37 +1,36 @@
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import redirect
-from django.contrib.auth.models import User
-from django.shortcuts import render
+from django.shortcuts import redirect, render, get_object_or_404
 from .models import Message
-
 
 @login_required
 def delete_user(request):
     user = request.user
-    user.delete()  # This triggers post_delete signals
-    return redirect('home')  # or any page after deletion
+    user.delete()  # triggers post_delete signals
+    return redirect('home')
 
 
 def message_thread_view(request):
-    # Fetch top-level messages (no parent) and their replies efficiently
+    # Top-level messages (parent_message is null) + replies
     messages = Message.objects.filter(parent_message__isnull=True) \
-        .select_related('author') \
-        .prefetch_related('replies__author')
+        .select_related('sender') \
+        .prefetch_related('replies__sender')
 
     return render(request, 'messaging/threaded_messages.html', {'messages': messages})
 
 
+@login_required
 def send_message_view(request):
     if request.method == "POST":
         content = request.POST.get('content')
-        parent_msg_id = request.POST.get('parent_message_id')  # optional reply
+        parent_msg_id = request.POST.get('parent_message_id')
         parent_msg = None
         if parent_msg_id:
-            parent_msg = Message.objects.get(id=parent_msg_id)
+            parent_msg = get_object_or_404(Message, id=parent_msg_id)
         
         Message.objects.create(
             content=content,
-            author=request.user,        # sender
-            parent_message=parent_msg,  # reply
-            # receiver=receiver_user,   # if you have a receiver field
+            sender=request.user,        # sender required by check
+            parent_message=parent_msg,  # optional reply
         )
+
+    return redirect('message_thread')  # adjust to your thread URL
