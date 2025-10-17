@@ -129,10 +129,15 @@ STATIC_URL = 'static/'
 
 
 # -------------------------------------------------------------------
-# Primary key & Custom user model
+# Primary key & User model
 # -------------------------------------------------------------------
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-AUTH_USER_MODEL = 'chats.User'
+# This project previously referenced a custom user model 'chats.User'.
+# The current codebase does not define that model. Use the built-in
+# Django auth user model to avoid startup errors. If you intend to
+# keep a custom user model, re-add it in `chats/models.py` and set
+# AUTH_USER_MODEL accordingly before running migrations.
+AUTH_USER_MODEL = 'auth.User'
 
 
 # -------------------------------------------------------------------

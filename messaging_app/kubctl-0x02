@@ -1,0 +1,109 @@
+#!/bin/bash
+
+# kubctl-0x02 - Task 4: Blue-Green Deployment
+# This script demonstrates blue-green deployment strategy
+
+echo "🔵🟢 Task 4: Blue-Green Deployment"
+echo "===================================="
+echo ""
+
+# Step 1: Deploy Blue (v1.0) - Current stable version
+echo "🔵 Step 1: Deploying BLUE version (v1.0)..."
+kubectl apply -f blue_deployment.yaml
+
+echo ""
+echo "⏳ Waiting for blue deployment to be ready..."
+kubectl wait --for=condition=available deployment/messaging-app-blue --timeout=60s
+
+echo ""
+echo "✅ Blue deployment status:"
+kubectl get deployment messaging-app-blue
+kubectl get pods -l version=blue
+
+echo ""
+echo "🔵 Step 2: Creating service pointing to BLUE..."
+kubectl apply -f kubeservice.yaml
+
+echo ""
+echo "⏳ Waiting for service to be ready..."
+sleep 5
+
+echo ""
+echo "🧪 Testing BLUE version..."
+kubectl get service messaging-app-bluegreen-service
+echo "Current traffic is going to BLUE deployment (v1.0)"
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Step 2: Deploy Green (v2.0) - New version
+echo "🟢 Step 3: Deploying GREEN version (v2.0) in parallel..."
+kubectl apply -f green_deployment.yaml
+
+echo ""
+echo "⏳ Waiting for green deployment to be ready..."
+kubectl wait --for=condition=available deployment/messaging-app-green --timeout=60s
+
+echo ""
+echo "✅ Green deployment status:"
+kubectl get deployment messaging-app-green
+kubectl get pods -l version=green
+
+echo ""
+echo "📊 Both versions are now running:"
+kubectl get deployments -l app=messaging-app
+kubectl get pods -l app=messaging-app -o wide
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Step 3: Test Green version privately
+echo "🧪 Step 4: Testing GREEN version (v2.0) privately..."
+echo "You can test green via its dedicated service:"
+kubectl get service messaging-app-green-service
+echo ""
+echo "Run this to test GREEN: kubectl port-forward service/messaging-app-green-service 8001:80"
+echo "Then access: http://localhost:8001"
+
+echo ""
+read -p "Press Enter when ready to switch traffic to GREEN..."
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Step 4: Switch traffic to Green
+echo "🔄 Step 5: Switching traffic from BLUE to GREEN..."
+kubectl patch service messaging-app-bluegreen-service -p '{"spec":{"selector":{"deployment":"green"}}}'
+
+echo ""
+echo "✅ Traffic switched! Main service now points to GREEN (v2.0)"
+kubectl get service messaging-app-bluegreen-service -o wide
+
+echo ""
+echo "🧪 Verify the switch:"
+kubectl describe service messaging-app-bluegreen-service | grep -A 5 "Selector"
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Monitor both deployments
+echo "📊 Final status - Both versions still running:"
+kubectl get deployments -l app=messaging-app
+kubectl get pods -l app=messaging-app
+
+echo ""
+echo "🎉 Blue-Green deployment complete!"
+echo ""
+echo "Summary:"
+echo "  🔵 BLUE (v1.0) is still running but not receiving traffic"
+echo "  🟢 GREEN (v2.0) is now live and handling all requests"
+echo ""
+echo "To rollback to BLUE if issues occur:"
+echo "  kubectl patch service messaging-app-bluegreen-service -p '{\"spec\":{\"selector\":{\"deployment\":\"blue\"}}}'"
+echo ""
+echo "To cleanup old BLUE deployment after testing:"
+echo "  kubectl delete deployment messaging-app-blue"

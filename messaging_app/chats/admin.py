@@ -4,14 +4,21 @@ from django.contrib import admin
 # chats/admin.py
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import User, Conversation, Message
+from django.contrib.auth import get_user_model
+from .models import Conversation, Message
 
-@admin.register(User)
-class CustomUserAdmin(UserAdmin):
-    fieldsets = UserAdmin.fieldsets + (
-        ('Extra', {'fields': ('role', 'phone_number', 'created_at')}),
-    )
-    readonly_fields = ('created_at',)
+# If you later add a custom User model in `chats.models`, change this
+# to register that model. For now, use the built-in user model.
+User = get_user_model()
+
+try:
+    @admin.register(User)
+    class CustomUserAdmin(UserAdmin):
+        # If the user model has extra fields, you can extend the fieldsets here.
+        readonly_fields = getattr(User, 'created_at', ()),
+except Exception:
+    # Fall back to not registering a custom User admin if the model isn't configurable
+    pass
 
 admin.site.register(Conversation)
 admin.site.register(Message)

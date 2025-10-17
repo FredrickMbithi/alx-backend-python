@@ -1,0 +1,50 @@
+# Task 3: Ingress Configuration
+# This exposes the messaging app to external traffic
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: messaging-app-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: messaging-app.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: messaging-app-service
+            port:
+              number: 80
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: messaging-app-service
+            port:
+              number: 80
+---
+# Alternative: Simple Ingress without host (access via IP)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: messaging-app-ingress-simple
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /messaging
+        pathType: Prefix
+        backend:
+          service:
+            name: messaging-app-service
+            port:
+              number: 80

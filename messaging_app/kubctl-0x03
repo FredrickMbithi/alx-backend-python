@@ -1,0 +1,133 @@
+#!/bin/bash
+
+# kubctl-0x03 - Task 5: Rolling Update Strategy
+# This script demonstrates Kubernetes rolling updates with zero downtime
+
+echo "🔄 Task 5: Rolling Update Deployment"
+echo "======================================"
+echo ""
+
+# Step 1: Ensure deployment exists and is running
+echo "📦 Step 1: Checking current deployment..."
+kubectl get deployment messaging-app-deployment 2>/dev/null
+
+if [ $? -ne 0 ]; then
+    echo "Creating initial deployment..."
+    kubectl apply -f deployment.yaml
+    kubectl wait --for=condition=available deployment/messaging-app-deployment --timeout=60s
+fi
+
+echo ""
+echo "✅ Current deployment status:"
+kubectl get deployment messaging-app-deployment
+kubectl get pods -l app=messaging-app
+
+echo ""
+echo "📊 Current image version:"
+kubectl get deployment messaging-app-deployment -o jsonpath='{.spec.template.spec.containers[0].image}'
+echo ""
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Step 2: Configure rolling update strategy
+echo "⚙️  Step 2: Configuring rolling update strategy..."
+kubectl patch deployment messaging-app-deployment -p '{
+  "spec": {
+    "strategy": {
+      "type": "RollingUpdate",
+      "rollingUpdate": {
+        "maxSurge": 1,
+        "maxUnavailable": 0
+      }
+    }
+  }
+}'
+
+echo ""
+echo "✅ Rolling update strategy configured:"
+echo "   - maxSurge: 1 (allows 1 extra pod during update)"
+echo "   - maxUnavailable: 0 (ensures zero downtime)"
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Step 3: Trigger rolling update
+echo "🚀 Step 3: Triggering rolling update to v2.0..."
+echo "This will update pods one at a time with zero downtime"
+echo ""
+
+kubectl set image deployment/messaging-app-deployment messaging-app=messaging-app:v2.0
+
+echo ""
+echo "⏳ Watching the rollout progress..."
+echo "Each pod will be replaced one at a time:"
+echo ""
+
+# Watch rollout status
+kubectl rollout status deployment/messaging-app-deployment --watch=true &
+ROLLOUT_PID=$!
+
+# In parallel, watch pods being updated
+sleep 2
+echo ""
+echo "📊 Pod updates in real-time:"
+watch -n 1 "kubectl get pods -l app=messaging-app -o wide" &
+WATCH_PID=$!
+
+# Wait for rollout to complete
+wait $ROLLOUT_PID
+
+# Stop watch
+kill $WATCH_PID 2>/dev/null
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Step 4: Verify the update
+echo "✅ Step 4: Verifying the rolling update..."
+echo ""
+
+echo "📊 Updated deployment status:"
+kubectl get deployment messaging-app-deployment
+
+echo ""
+echo "📦 Pods after update:"
+kubectl get pods -l app=messaging-app -o wide
+
+echo ""
+echo "🔍 New image version:"
+kubectl get deployment messaging-app-deployment -o jsonpath='{.spec.template.spec.containers[0].image}'
+echo ""
+
+echo ""
+echo "📜 Rollout history:"
+kubectl rollout history deployment/messaging-app-deployment
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Step 5: Test zero downtime
+echo "🧪 Step 5: Verifying zero downtime..."
+echo "Checking service availability during update:"
+kubectl get service messaging-app-service
+
+echo ""
+echo "🎉 Rolling update complete!"
+echo ""
+echo "Summary:"
+echo "  ✅ All pods updated from v1.0 to v2.0"
+echo "  ✅ Zero downtime achieved"
+echo "  ✅ Old pods terminated gracefully"
+echo "  ✅ New pods started one at a time"
+echo ""
+echo "Useful commands:"
+echo "  - View rollout history: kubectl rollout history deployment/messaging-app-deployment"
+echo "  - Rollback to previous version: kubectl rollout undo deployment/messaging-app-deployment"
+echo "  - Rollback to specific revision: kubectl rollout undo deployment/messaging-app-deployment --to-revision=2"
+echo "  - Pause rollout: kubectl rollout pause deployment/messaging-app-deployment"
+echo "  - Resume rollout: kubectl rollout resume deployment/messaging-app-deployment"

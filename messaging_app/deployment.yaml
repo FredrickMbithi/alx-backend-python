@@ -1,0 +1,68 @@
+# Task 1: Basic Kubernetes Deployment
+# This deploys the Django messaging app to Kubernetes
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: messaging-app-deployment
+  labels:
+    app: messaging-app
+spec:
+  replicas: 1  # Start with a single pod
+  selector:
+    matchLabels:
+      app: messaging-app
+  template:
+    metadata:
+      labels:
+        app: messaging-app
+        version: v1.0
+    spec:
+      containers:
+      - name: messaging-app
+        image: messaging-app:latest
+        imagePullPolicy: Never  # Use local image (from Minikube's Docker)
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: DEBUG
+          value: "True"
+        - name: ALLOWED_HOSTS
+          value: "*"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+# Service to expose the deployment internally
+apiVersion: v1
+kind: Service
+metadata:
+  name: messaging-app-service
+  labels:
+    app: messaging-app
+spec:
+  type: ClusterIP
+  selector:
+    app: messaging-app
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8000
+    name: http

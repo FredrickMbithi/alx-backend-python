@@ -1,0 +1,60 @@
+# Task 4: Green Deployment (New Version)
+# This represents the new version v2.0 to be tested
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: messaging-app-green
+  labels:
+    app: messaging-app
+    version: green
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: messaging-app
+      version: green
+  template:
+    metadata:
+      labels:
+        app: messaging-app
+        version: green
+        deployment: green
+    spec:
+      containers:
+      - name: messaging-app
+        image: messaging-app:v2.0
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: VERSION
+          value: "v2.0-green"
+        - name: DEBUG
+          value: "True"
+        - name: ALLOWED_HOSTS
+          value: "*"
+        - name: DEPLOYMENT_TYPE
+          value: "GREEN"
+        - name: NEW_FEATURE_ENABLED
+          value: "true"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5

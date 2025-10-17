@@ -1,0 +1,37 @@
+# Task 3: Ingress Setup Commands
+# Commands used to enable and configure Ingress on Minikube
+
+# Step 1: Enable the Ingress addon in Minikube
+minikube addons enable ingress
+
+# Step 2: Verify Ingress controller is running
+kubectl get pods -n ingress-nginx
+
+# Step 3: Apply the Ingress configuration
+kubectl apply -f ingress.yaml
+
+# Step 4: Verify Ingress was created
+kubectl get ingress
+
+# Step 5: Get Minikube IP address
+minikube ip
+
+# Step 6: Test access to the app (replace <MINIKUBE-IP> with actual IP)
+curl http://<MINIKUBE-IP>/messaging
+
+# Alternative: Access via hostname (add to /etc/hosts or C:\Windows\System32\drivers\etc\hosts)
+# <MINIKUBE-IP> messaging-app.local
+# Then access: http://messaging-app.local
+
+# Step 7: Describe Ingress to see details
+kubectl describe ingress messaging-app-ingress
+
+# Step 8: Check Ingress logs if there are issues
+kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx
+
+# Optional: Port forward for direct access (alternative to Ingress)
+# kubectl port-forward service/messaging-app-service 8080:80
+# Then access: http://localhost:8080
+
+# To delete Ingress:
+# kubectl delete ingress messaging-app-ingress messaging-app-ingress-simple

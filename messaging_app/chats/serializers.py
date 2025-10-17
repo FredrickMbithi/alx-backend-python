@@ -1,8 +1,10 @@
 # chats/serializers.py
 
 from rest_framework import serializers
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from .models import Conversation, Message
+
+User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
     """
@@ -10,6 +12,8 @@ class UserSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = User
+        # Some user models may use 'id' or 'user_id' as the primary key.
+        # Keep commonly used display fields; adjust if you have a custom user model.
         fields = ['id', 'username', 'first_name', 'last_name', 'email']
         read_only_fields = ['id']
 
@@ -65,7 +69,11 @@ class ConversationSerializer(serializers.ModelSerializer):
         
         # Add other participants
         if participant_ids:
-            users = User.objects.filter(id__in=participant_ids)
+            # Try filtering by 'id' first, fall back to 'user_id' for custom PKs
+            try:
+                users = User.objects.filter(id__in=participant_ids)
+            except Exception:
+                users = User.objects.filter(user_id__in=participant_ids)
             conversation.participants.add(*users)
         
         return conversation
