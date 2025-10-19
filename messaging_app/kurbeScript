@@ -4,28 +4,34 @@
 
 set -e
 
-# Ensure minikube is installed
+echo "Checking if minikube is installed..."
 if ! command -v minikube &> /dev/null; then
     echo "Error: minikube is not installed"
     exit 1
 fi
+echo "✓ minikube is installed"
+minikube version
 
-# Ensure kubectl is installed
+echo ""
+echo "Checking if kubectl is installed..."
 if ! command -v kubectl &> /dev/null; then
     echo "Error: kubectl is not installed"
     exit 1
 fi
+echo "✓ kubectl is installed"
+kubectl version --client
 
-# Start Kubernetes cluster
-echo "Starting Kubernetes cluster..."
+echo ""
+echo "Starting Kubernetes cluster on your machine..."
 minikube start
 
-# Verify cluster is running
-echo "Verifying cluster with kubectl cluster-info..."
+echo ""
+echo "Verifying that the cluster is running using kubectl cluster-info..."
 kubectl cluster-info
 
-# Retrieve available pods
-echo "Retrieving available pods..."
+echo ""
+echo "Retrieving the available pods..."
 kubectl get pods --all-namespaces
 
-echo "Cluster setup complete."
+echo ""
+echo "✓ Cluster setup complete."
