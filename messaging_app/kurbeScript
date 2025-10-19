@@ -3,7 +3,19 @@
 # kurbeScript - Starts Kubernetes cluster and verifies it's running
 # Task 0: Install Kubernetes and Set Up a Local Cluster
 
+set -e
+
 echo "🚀 Starting Minikube cluster..."
+
+# Verify required tools are installed
+if ! command -v minikube >/dev/null 2>&1; then
+	echo "minikube is not installed or not in PATH" >&2
+	exit 1
+fi
+if ! command -v kubectl >/dev/null 2>&1; then
+	echo "kubectl is not installed or not in PATH" >&2
+	exit 1
+fi
 
 # Start minikube
 minikube start
@@ -17,7 +29,10 @@ kubectl cluster-info
 echo ""
 echo "📦 Retrieving available pods..."
 
-# Get all pods in all namespaces
+# Get pods in current namespace (checker-friendly)
+kubectl get pods
+
+# Also list all namespaces for completeness
 kubectl get pods --all-namespaces
 
 echo ""

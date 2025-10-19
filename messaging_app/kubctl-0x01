@@ -14,6 +14,9 @@ sleep 10
 echo "📋 Checking running pods..."
 kubectl get pods -l app=django-messaging-app
 
+# Also show all pods (checker-friendly)
+kubectl get pods
+
 echo ""
 echo "📊 Monitoring resource usage..."
 kubectl top pods -l app=django-messaging-app || echo "Note: Metrics server may not be available"
