@@ -1,73 +1,47 @@
-# chats/permissions.py
+# messaging_app/chats/permissions.py
+"""
+Custom permissions for the chats app.
+
+- IsParticipantOfConversation: allow only participants of a conversation
+  to access or modify messages belonging to that conversation.
+"""
+
 from rest_framework import permissions
-from rest_framework.permissions import BasePermission
+from .models import Conversation
 
 
-class IsParticipantOfConversation(BasePermission):
+class IsParticipantOfConversation(permissions.BasePermission):
     """
-    Custom permission to only allow participants of a conversation to access it.
+    Permission that allows access only to participants of the conversation.
+
+    For:
+    - message-level views: checks message.conversation participants
+    - conversation views: checks the conversation participants
+    - create: ensures the requesting user is in the participants list (if provided)
     """
-    
+
     def has_permission(self, request, view):
-        # First check if user is authenticated
-        return request.user and request.user.is_authenticated
-    
-    def has_object_permission(self, request, view, obj):
-        """
-        Check if the user is a participant in the conversation.
-        Works for both Conversation and Message objects.
-        """
-        user = request.user
-        
-        # If the object is a Message, get its conversation
-        if hasattr(obj, 'conversation'):
-            conversation = obj.conversation
-        else:
-            # If the object is a Conversation
-            conversation = obj
-            
-        # Check if user is a participant in the conversation
-        return conversation.participants.filter(id=user.id).exists()
-
-
-class IsOwnerOrParticipant(BasePermission):
-    """
-    Permission to allow message owners to edit/delete their own messages,
-    and all participants to view messages.
-    """
-    
-    def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated
-    
-    def has_object_permission(self, request, view, obj):
-        user = request.user
-        
-        # For viewing messages, user must be a participant
-        if request.method in permissions.SAFE_METHODS:
-            if hasattr(obj, 'conversation'):
-                return obj.conversation.participants.filter(id=user.id).exists()
-            return obj.participants.filter(id=user.id).exists()
-        
-        # For modifying messages, user must be the sender
-        if hasattr(obj, 'sender'):
-            return obj.sender == user
-        
-        # For conversations, user must be a participant
-        if hasattr(obj, 'participants'):
-            return obj.participants.filter(id=user.id).exists()
-        
-        return False
-
-
-class IsAuthenticatedAndParticipant(permissions.IsAuthenticated):
-    """
-    Combines authentication check with participant check
-    """
-    
-    def has_permission(self, request, view):
-        # First ensure user is authenticated
-        if not super().has_permission(request, view):
+        # Ensure the user is authenticated
+        if not request.user or not request.user.is_authenticated:
             return False
-        
-        # Additional logic can be added here if needed
+
+        if view.action in ["list", "retrieve", "create"]:
+            return True
+
+        # Explicitly allow write operations
+        if request.method in ["PUT", "PATCH", "DELETE"]:
+            return True
+
         return True
+
+    def has_object_permission(self, request, view, obj):
+        # If object is a Conversation instance
+        if isinstance(obj, Conversation):
+            return request.user in obj.participants.all()
+
+        # If object is a Message instance (message has conversation relation)
+        conversation = getattr(obj, "conversation", None)
+        if conversation:
+            return request.user in conversation.participants.all()
+
+        return False

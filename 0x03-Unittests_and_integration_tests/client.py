@@ -1,12 +1,3 @@
-@staticmethod
-def has_license(repo: Dict[str, Dict], license_key: str) -> bool:
-    """Static: has_license"""
-    assert license_key is not None, "license_key cannot be None"
-    try:
-        has_license = access_nested_map(repo, ("license", "key")) == license_key
-    except KeyError:
-        return False
-    return has_license
 #!/usr/bin/env python3
 """A github org client
 """

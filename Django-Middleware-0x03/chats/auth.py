@@ -1,9 +1,16 @@
-from rest_framework_simplejwt.authentication import JWTAuthentication
+# messaging_app/chats/auth.py
+"""
+Authentication helpers for chats app.
 
-class CustomJWTAuthentication(JWTAuthentication):
+Provides a small utility to generate tokens for a user (used in tests or manual runs).
+"""
+from rest_framework_simplejwt.tokens import RefreshToken
+
+
+def get_tokens_for_user(user):
     """
-    Custom JWT Authentication.
-    You can extend this later with extra checks.
+    Return JWT (refresh + access) for the given user.
+    Useful for testing and seeding automated requests.
     """
-    def authenticate(self, request):
-        return super().authenticate(request)
+    refresh = RefreshToken.for_user(user)
+    return {"refresh": str(refresh), "access": str(refresh.access_token)}

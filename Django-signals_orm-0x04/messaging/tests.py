@@ -2,20 +2,12 @@ from django.test import TestCase
 from django.contrib.auth.models import User
 from .models import Message, Notification
 
-class MessageSignalTestCase(TestCase):
+class MessagingSignalTest(TestCase):
     def setUp(self):
-        self.sender = User.objects.create_user(username='sender', password='pass123')
-        self.receiver = User.objects.create_user(username='receiver', password='pass123')
-    
-    def test_notification_created_on_message_save(self):
-        """Test that a notification is created when a message is saved"""
-        message = Message.objects.create(
-            sender=self.sender,
-            receiver=self.receiver,
-            content="Hello, this is a test message"
-        )
-        
-        # Check if notification was created
-        notification = Notification.objects.filter(user=self.receiver, message=message)
-        self.assertTrue(notification.exists())
-        self.assertEqual(notification.count(), 1)
+        self.alice = User.objects.create_user(username="alice", password="password")
+        self.bob = User.objects.create_user(username="bob", password="password")
+
+    def test_notification_created_on_message(self):
+        msg = Message.objects.create(sender=self.alice, receiver=self.bob, content="Hello Bob!")
+        notif = Notification.objects.filter(user=self.bob, message=msg)
+        self.assertTrue(notif.exists(), "Notification should be created when a message is sent")

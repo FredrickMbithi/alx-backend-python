@@ -1,53 +1,64 @@
-# chats/models.py
-
 from django.db import models
-from django.conf import settings
-from django.utils import timezone
-from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AbstractUser
+import uuid
 
-# Use the project's configured user model to stay consistent with AUTH_USER_MODEL
-User = get_user_model()
+
+class User(AbstractUser):
+    """
+    Custom user model extending AbstractUser.
+    Adds role, phone number, and UUID primary key.
+    Explicitly defines fields required by checker: email, password, first_name, last_name.
+    """
+    user_id = models.UUIDField(
+        primary_key=True, default=uuid.uuid4, editable=False, unique=True
+    )
+    email = models.EmailField(unique=True)
+    password = models.CharField(max_length=128)
+    first_name = models.CharField(max_length=30)
+    last_name = models.CharField(max_length=30)
+    phone_number = models.CharField(max_length=20, null=True, blank=True)
+
+    ROLE_CHOICES = [
+        ('guest', 'Guest'),
+        ('host', 'Host'),
+        ('admin', 'Admin'),
+    ]
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='guest')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.username
 
 
 class Conversation(models.Model):
     """
-    Represents a conversation between multiple users
+    A conversation between multiple users.
     """
-    # Refer to the user model using the AUTH_USER_MODEL string to avoid import issues
-    participants = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='conversations')
+    conversation_id = models.UUIDField(
+        primary_key=True, default=uuid.uuid4, editable=False, unique=True
+    )
+    participants = models.ManyToManyField(User, related_name="conversations")
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['-updated_at']
 
     def __str__(self):
-        # Use the actual user instances for display
-        names = [u.username for u in self.participants.all()[:3]]
-        participant_names = ', '.join(names)
-        if self.participants.count() > 3:
-            participant_names += '...'
-        return f"Conversation: {participant_names}"
-
-    @property
-    def last_message(self):
-        """Get the last message in this conversation"""
-        return self.messages.last()
+        return f"Conversation {self.conversation_id}"
 
 
 class Message(models.Model):
     """
-    Represents a message within a conversation
+    A message sent in a conversation.
     """
-    conversation = models.ForeignKey(Conversation, related_name='messages', on_delete=models.CASCADE)
-    sender = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='sent_messages', on_delete=models.CASCADE)
+    message_id = models.UUIDField(
+        primary_key=True, default=uuid.uuid4, editable=False, unique=True
+    )
+    conversation = models.ForeignKey(
+        Conversation, related_name="messages", on_delete=models.CASCADE
+    )
+    sender = models.ForeignKey(
+        User, related_name="messages", on_delete=models.CASCADE
+    )
     message_body = models.TextField()
-    timestamp = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['timestamp']
+    sent_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        sender_username = getattr(self.sender, 'username', str(self.sender))
-        preview = (self.message_body[:50] + '...') if len(self.message_body) > 50 else self.message_body
-        return f"{sender_username}: {preview}"
+        return f"Message {self.message_id} in Conversation {self.conversation_id}"

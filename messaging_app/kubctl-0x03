@@ -1,81 +1,31 @@
 #!/bin/bash
+# kubctl-0x03 - Task 5 helper script for rolling updates
+# Applies updated blue_deployment.yaml (image version 2.0), triggers rollout, and monitors status.
 
-# kubctl-0x03 - Rolling Update Script
-# Task 5: Applying rolling updates
+set -euo pipefail
 
-echo "🔄 Starting rolling update for Django messaging app..."
+info() { printf '[INFO] %s\n' "$1"; }
 
-# Apply the updated deployment file (triggers rolling update)
-echo "📝 Applying updated blue_deployment.yaml with v2.0..."
+info "Applying blue deployment (updated image tag 2.0)"
 kubectl apply -f blue_deployment.yaml
 
-echo ""
-echo "⏳ Monitoring rolling update progress..."
+info "Waiting for rollout to complete"
+kubectl rollout status deployment/messaging-app-blue --timeout=120s
 
-# Monitor the rollout status
-kubectl rollout status deployment/django-messaging-app-blue --timeout=300s
+info "Testing service availability with continuous curl in background"
+SERVICE_URL=$(minikube service messaging-app-service --url)
 
-echo ""
-echo "🧪 Testing app availability during update..."
+# Run a background loop of curl to ensure no downtime during rollout
+( while true; do curl -s -o /dev/null -w "%{http_code}\n" "${SERVICE_URL}"; sleep 1; done ) &
+CURL_PID=$!
 
-# Start continuous testing in background
-echo "Starting continuous availability test..."
+info "Sleeping 10s during rollout observation"
+sleep 10
 
-# Port forward for testing
-kubectl port-forward service/django-messaging-service-blue 8001:8000 &
-PORT_FORWARD_PID=$!
+info "Stopping background curl"
+kill ${CURL_PID} || true
 
-# Wait for port forward to establish
-sleep 5
+info "Listing pods after rollout"
+kubectl get pods -l app=messaging-app -o wide
 
-# Continuous testing function
-test_availability() {
-    echo "🔍 Testing app availability (30 requests over 30 seconds)..."
-    success_count=0
-    total_requests=30
-    
-    for i in $(seq 1 $total_requests); do
-        response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8001/ 2>/dev/null)
-        if [ "$response" = "200" ]; then
-            echo "✅ Request $i: Success ($response)"
-            ((success_count++))
-        else
-            echo "❌ Request $i: Failed ($response)"
-        fi
-        sleep 1
-    done
-    
-    echo ""
-    echo "📊 Availability Test Results:"
-    echo "   Successful requests: $success_count/$total_requests"
-    echo "   Success rate: $((success_count * 100 / total_requests))%"
-}
-
-# Run availability test
-test_availability
-
-# Clean up port forward
-kill $PORT_FORWARD_PID 2>/dev/null
-
-echo ""
-echo "🔍 Verifying rolling update completion..."
-
-# Check current pods
-echo "Current pods:"
-kubectl get pods -l app=django-messaging-app,version=blue
-
-echo ""
-echo "📋 Deployment status:"
-kubectl get deployment django-messaging-app-blue
-
-echo ""
-echo "📝 Rollout history:"
-kubectl rollout history deployment/django-messaging-app-blue
-
-echo ""
-echo "🔍 Checking pod image versions:"
-kubectl get pods -l app=django-messaging-app,version=blue -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.containers[0].image}{"\n"}{end}'
-
-echo ""
-echo "✅ Rolling update complete!"
-echo "📊 Use 'kubectl describe deployment django-messaging-app-blue' for detailed status"
+info "Rolling update script completed"

@@ -1,0 +1,27 @@
+#!/bin/bash
+# kurbeScript
+# Author: Mike Moreti
+# Purpose: Start and verify a local Kubernetes cluster using Minikube
+# Requirements: Minikube and kubectl must be installed
+
+# Check if Minikube is installed
+if ! command -v minikube &> /dev/null
+then
+    echo "Error: Minikube is not installed. Please install Minikube first."
+    exit 1
+fi
+
+# Start the Minikube cluster
+echo " Starting Minikube cluster..."
+minikube start
+
+# Verify that the cluster is running
+echo " Verifying Kubernetes cluster information..."
+kubectl cluster-info
+
+# Retrieve available pods in all namespaces
+echo " Listing all pods in the cluster..."
+kubectl get pods -A
+
+# Final confirmation message
+echo " Kubernetes cluster is up and running successfully."
