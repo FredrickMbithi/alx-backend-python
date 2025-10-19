@@ -29,7 +29,8 @@ SERVICE_IP=$(kubectl get service django-messaging-service -o jsonpath='{.spec.cl
 echo "Service IP: $SERVICE_IP"
 
 # Port forward for load testing (run in background)
-kubectl port-forward service/django-messaging-service 8000:8000 &
+# Service exposes port 80 -> container 8000, so forward 8000:80
+kubectl port-forward service/django-messaging-service 8000:80 &
 PORT_FORWARD_PID=$!
 
 # Wait for port forward to establish
@@ -48,7 +49,9 @@ else
 fi
 
 # Clean up port forward
-kill $PORT_FORWARD_PID 2>/dev/null
+if [ -n "${PORT_FORWARD_PID:-}" ]; then
+    kill $PORT_FORWARD_PID 2>/dev/null || true
+fi
 
 echo ""
 echo "✅ Load testing complete! Check pods status:"

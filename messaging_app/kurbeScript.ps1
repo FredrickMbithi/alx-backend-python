@@ -3,6 +3,28 @@
 
 $ErrorActionPreference = 'Stop'
 
+Write-Host "[kurbeScript.ps1] Ensuring minikube and kubectl are installed..." -ForegroundColor Cyan
+
+# Try to install tools if missing (Windows friendly)
+function Ensure-Tool($name, $wingetId, $chocoId) {
+    if (Get-Command $name -ErrorAction SilentlyContinue) { return }
+    Write-Host "Installing $name..." -ForegroundColor Yellow
+    try {
+        if (Get-Command winget -ErrorAction SilentlyContinue) {
+            winget install --silent --accept-package-agreements --accept-source-agreements $wingetId | Out-Null
+        } elseif (Get-Command choco -ErrorAction SilentlyContinue) {
+            choco install $chocoId -y | Out-Null
+        } else {
+            Write-Host "winget/choco not found. Please install $name manually and re-run." -ForegroundColor Red
+        }
+    } catch {
+        Write-Host "Failed to install $name automatically. Please install it manually." -ForegroundColor Red
+    }
+}
+
+Ensure-Tool -name "kubectl" -wingetId "Kubernetes.kubectl" -chocoId "kubernetes-cli"
+Ensure-Tool -name "minikube" -wingetId "Kubernetes.minikube" -chocoId "minikube"
+
 Write-Host "Starting Minikube cluster..." -ForegroundColor Cyan
 
 # Verify required tools are installed
