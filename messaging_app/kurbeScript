@@ -1,87 +1,37 @@
-#!/usr/bin/env bash
-# kurbeScript - Start a local Kubernetes cluster and verify it is running
-# Task 0: Install Kubernetes and Set Up a Local Cluster
+#!/bin/bash
+# kurbeScript - helper for ALX Kubernetes task 0
+# This script starts a local Minikube cluster, verifies it, and lists pods.
+# It assumes Docker is installed and the current user has permission to access the Docker socket.
 
 set -euo pipefail
 
-echo "Checking if minikube is installed..."
+# Utility function for consistent messaging
+info() {
+  printf '[INFO] %s\n' "$1"
+}
+
+error_exit() {
+  printf '[ERROR] %s\n' "$1" >&2
+  exit 1
+}
+
+# Ensure minikube is installed
 if ! command -v minikube >/dev/null 2>&1; then
-    echo "minikube not found. Attempting installation..."
-    OS_NAME="$(uname -s 2>/dev/null || echo Unknown)"
-    case "$OS_NAME" in
-        Linux)
-            curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-            sudo install minikube-linux-amd64 /usr/local/bin/minikube
-            rm -f minikube-linux-amd64
-            ;;
-        Darwin)
-            if command -v brew >/dev/null 2>&1; then
-                brew install minikube
-            else
-                curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-darwin-amd64
-                sudo install minikube-darwin-amd64 /usr/local/bin/minikube
-                rm -f minikube-darwin-amd64
-            fi
-            ;;
-        *)
-            echo "Automatic minikube installation is not supported on this platform." >&2
-            ;;
-    esac
+  error_exit "Minikube is not installed. Please install it from https://minikube.sigs.k8s.io/docs/start/"
 fi
 
-if ! command -v minikube >/dev/null 2>&1; then
-    echo "Error: minikube is not installed"
-    exit 1
-fi
-echo "minikube is installed"
-minikube version
-
-echo
-echo "Checking if kubectl is installed..."
+# Ensure kubectl is installed
 if ! command -v kubectl >/dev/null 2>&1; then
-    echo "kubectl not found. Attempting installation..."
-    OS_NAME="$(uname -s 2>/dev/null || echo Unknown)"
-    case "$OS_NAME" in
-        Linux)
-            curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-            chmod +x kubectl
-            sudo mv kubectl /usr/local/bin/kubectl
-            ;;
-        Darwin)
-            if command -v brew >/dev/null 2>&1; then
-                brew install kubectl
-            else
-                curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/darwin/amd64/kubectl"
-                chmod +x kubectl
-                sudo mv kubectl /usr/local/bin/kubectl
-            fi
-            ;;
-        *)
-            echo "Automatic kubectl installation is not supported on this platform." >&2
-            ;;
-    esac
+  error_exit "kubectl is not installed. Please install it from https://kubernetes.io/docs/tasks/tools/"
 fi
 
-if ! command -v kubectl >/dev/null 2>&1; then
-    echo "Error: kubectl is not installed"
-    exit 1
-fi
-echo "kubectl is installed"
-kubectl version --client
+info "Starting (or resuming) the Minikube cluster using the Docker driver"
+minikube start --driver=docker
 
-echo
-echo "Starting Kubernetes cluster on your machine..."
-minikube start
-
-echo
-echo "Verifying that the cluster is running using kubectl cluster-info..."
+info "Verifying cluster information"
 kubectl cluster-info
 
-echo
-echo "Retrieving the available pods..."
-if ! kubectl get pods --all-namespaces; then
-    echo "kubectl get pods failed. Continuing to finish script." >&2
-fi
+info "Listing pods across all namespaces"
+kubectl get pods --all-namespaces
 
-echo
-echo "Cluster setup complete."
+info "Script completed successfully"
