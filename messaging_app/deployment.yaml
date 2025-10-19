@@ -1,6 +1,3 @@
-# Django Messaging App Kubernetes Deployment
-# This file deploys the Django messaging app to Kubernetes cluster
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
