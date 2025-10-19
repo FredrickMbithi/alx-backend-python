@@ -5,6 +5,7 @@ services:
     restart: always
     environment:
       MYSQL_DATABASE: messaging_db
+      MYSQL_DB: messaging_db
       MYSQL_USER: user
       MYSQL_PASSWORD: password
       MYSQL_ROOT_PASSWORD: rootpassword
@@ -22,7 +23,7 @@ services:
   web:
     build: .
     container_name: messaging_app_web
-    command: ["sh", "-c", "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"]
+    command: ["sh", "-c", "python3 manage.py migrate && python3 manage.py runserver 0.0.0.0:8000"]
     volumes:
       - .:/app
     ports:
