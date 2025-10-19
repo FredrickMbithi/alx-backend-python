@@ -76,6 +76,10 @@ if ! command -v kubectl >/dev/null 2>&1; then
   exit 1
 fi
 
+echo "[kurbeScript] Tool versions:"
+minikube version || true
+kubectl version --client || true
+
 echo "[kurbeScript] Starting Minikube..."
 minikube start
 
