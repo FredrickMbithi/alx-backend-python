@@ -2,107 +2,30 @@
 # kurbeScript - Start a local Kubernetes cluster and verify it's running
 # Task 0: Install Kubernetes and Set Up a Local Cluster
 
-set -euo pipefail
+set -e
 
-echo "[kurbeScript] Ensuring minikube and kubectl are installed..."
-
-OS="$(uname -s 2>/dev/null || echo unknown)"
-
-install_kubectl() {
-  if command -v kubectl >/dev/null 2>&1; then
-    return 0
-  fi
-  echo "[kurbeScript] Installing kubectl..."
-  case "$OS" in
-    Linux)
-      curl -LO https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl
-      chmod +x kubectl
-      sudo mv kubectl /usr/local/bin/kubectl
-      ;;
-    Darwin)
-      if command -v brew >/dev/null 2>&1; then
-        brew install kubectl
-      else
-        curl -LO https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/darwin/amd64/kubectl
-        chmod +x kubectl
-        sudo mv kubectl /usr/local/bin/kubectl
-      fi
-      ;;
-    *)
-      echo "[kurbeScript] Non-Unix environment detected. On Windows, please run the PowerShell script: kurbeScript.ps1" >&2
-      ;;
-  esac
-}
-
-install_minikube() {
-  if command -v minikube >/dev/null 2>&1; then
-    return 0
-  fi
-  echo "[kurbeScript] Installing minikube..."
-  case "$OS" in
-    Linux)
-      curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-      sudo install minikube-linux-amd64 /usr/local/bin/minikube
-      rm -f minikube-linux-amd64
-      ;;
-    Darwin)
-      if command -v brew >/dev/null 2>&1; then
-        brew install minikube
-      else
-        curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-darwin-amd64
-        sudo install minikube-darwin-amd64 /usr/local/bin/minikube
-        rm -f minikube-darwin-amd64
-      fi
-      ;;
-    *)
-      echo "[kurbeScript] Non-Unix environment detected. On Windows, please run the PowerShell script: kurbeScript.ps1" >&2
-      ;;
-  esac
-}
-
-# Attempt installation on supported platforms
-install_kubectl || true
-install_minikube || true
-
-# Verify required tools are installed
-if ! command -v minikube >/dev/null 2>&1; then
-  echo "[kurbeScript] ERROR: minikube is not installed or not in PATH." >&2
-  echo "[kurbeScript] If you're on Windows, run PowerShell script: ./kurbeScript.ps1" >&2
-  exit 1
-fi
-if ! command -v kubectl >/dev/null 2>&1; then
-  echo "[kurbeScript] ERROR: kubectl is not installed or not in PATH." >&2
-  echo "[kurbeScript] If you're on Windows, run PowerShell script: ./kurbeScript.ps1" >&2
-  exit 1
+# Ensure minikube is installed
+if ! command -v minikube &> /dev/null; then
+    echo "Error: minikube is not installed"
+    exit 1
 fi
 
-echo "[kurbeScript] Tool versions:"
-echo "Checking minikube installation..."
-minikube version
-echo "Checking kubectl installation..."
-kubectl version --client
+# Ensure kubectl is installed
+if ! command -v kubectl &> /dev/null; then
+    echo "Error: kubectl is not installed"
+    exit 1
+fi
 
-echo
-echo "[kurbeScript] Starting Minikube cluster..."
+# Start Kubernetes cluster
+echo "Starting Kubernetes cluster..."
 minikube start
 
-echo
-echo "[kurbeScript] Verifying cluster is running..."
-echo "Running: kubectl cluster-info"
+# Verify cluster is running
+echo "Verifying cluster with kubectl cluster-info..."
 kubectl cluster-info
 
-echo
-echo "[kurbeScript] Retrieving available pods in default namespace..."
-kubectl get pods 2>/dev/null || echo "No pods in default namespace yet"
-
-echo
-echo "[kurbeScript] Retrieving all pods across all namespaces..."
+# Retrieve available pods
+echo "Retrieving available pods..."
 kubectl get pods --all-namespaces
 
-echo
-echo "========================================="
-echo "[kurbeScript] ✓ Cluster setup completed successfully"
-echo "[kurbeScript] ✓ Minikube is running"
-echo "[kurbeScript] ✓ kubectl cluster-info verified"
-echo "[kurbeScript] ✓ Pods retrieved"
-echo "========================================="
+echo "Cluster setup complete."
