@@ -1,0 +1,61 @@
+#!/bin/bash
+
+# kubctl-0x02 - Blue-Green Deployment Script
+# Task 4: Implement a Blue-Green Deployment Strategy
+
+echo "🔵 Deploying Blue version (current)..."
+
+# Deploy blue version
+kubectl apply -f blue_deployment.yaml
+
+echo "⏳ Waiting for blue deployment to be ready..."
+kubectl wait --for=condition=available --timeout=300s deployment/django-messaging-app-blue
+
+echo "🟢 Deploying Green version (new)..."
+
+# Deploy green version
+kubectl apply -f green_deployment.yaml
+
+echo "⏳ Waiting for green deployment to be ready..."
+kubectl wait --for=condition=available --timeout=300s deployment/django-messaging-app-green
+
+echo "🔧 Setting up services..."
+
+# Apply services
+kubectl apply -f kubeservice.yaml
+
+echo ""
+echo "📋 Checking deployments status..."
+kubectl get deployments -l app=django-messaging-app
+
+echo ""
+echo "📋 Checking pods status..."
+kubectl get pods -l app=django-messaging-app
+
+echo ""
+echo "🔍 Checking logs for blue deployment..."
+BLUE_POD=$(kubectl get pods -l app=django-messaging-app,version=blue -o jsonpath='{.items[0].metadata.name}')
+if [ ! -z "$BLUE_POD" ]; then
+    echo "Blue pod logs ($BLUE_POD):"
+    kubectl logs $BLUE_POD --tail=10
+else
+    echo "No blue pods found"
+fi
+
+echo ""
+echo "🔍 Checking logs for green deployment..."
+GREEN_POD=$(kubectl get pods -l app=django-messaging-app,version=green -o jsonpath='{.items[0].metadata.name}')
+if [ ! -z "$GREEN_POD" ]; then
+    echo "Green pod logs ($GREEN_POD):"
+    kubectl logs $GREEN_POD --tail=10
+else
+    echo "No green pods found"
+fi
+
+echo ""
+echo "🔄 Current service routing (main service points to blue):"
+kubectl get service django-messaging-service-main -o yaml | grep -A 3 selector
+
+echo ""
+echo "✅ Blue-Green deployment complete!"
+echo "📝 To switch traffic to green: kubectl patch service django-messaging-service-main -p '{\"spec\":{\"selector\":{\"version\":\"green\"}}}'"
