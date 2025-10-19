@@ -77,20 +77,32 @@ if ! command -v kubectl >/dev/null 2>&1; then
 fi
 
 echo "[kurbeScript] Tool versions:"
-minikube version || true
-kubectl version --client || true
+echo "Checking minikube installation..."
+minikube version
+echo "Checking kubectl installation..."
+kubectl version --client
 
-echo "[kurbeScript] Starting Minikube..."
+echo
+echo "[kurbeScript] Starting Minikube cluster..."
 minikube start
 
 echo
-echo "[kurbeScript] Verifying cluster is running (kubectl cluster-info)..."
+echo "[kurbeScript] Verifying cluster is running..."
+echo "Running: kubectl cluster-info"
 kubectl cluster-info
 
 echo
-echo "[kurbeScript] Retrieving available pods..."
-kubectl get pods || true
-kubectl get pods --all-namespaces || true
+echo "[kurbeScript] Retrieving available pods in default namespace..."
+kubectl get pods 2>/dev/null || echo "No pods in default namespace yet"
 
 echo
-echo "[kurbeScript] Cluster setup and verification completed."
+echo "[kurbeScript] Retrieving all pods across all namespaces..."
+kubectl get pods --all-namespaces
+
+echo
+echo "========================================="
+echo "[kurbeScript] ✓ Cluster setup completed successfully"
+echo "[kurbeScript] ✓ Minikube is running"
+echo "[kurbeScript] ✓ kubectl cluster-info verified"
+echo "[kurbeScript] ✓ Pods retrieved"
+echo "========================================="
