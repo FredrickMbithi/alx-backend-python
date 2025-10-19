@@ -1,3 +1,4 @@
 # Enforce LF endings for Docker-related files and scripts
 Dockerfile text eol=lf
 *.sh text eol=lf
+kurbeScript text eol=lf
