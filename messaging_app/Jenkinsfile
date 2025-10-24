@@ -148,7 +148,7 @@ pipeline {
                         . ${VENV_DIR}/bin/activate
                         
                         echo "Running tests with pytest..."
-                        pytest . --junitxml=report.xml --maxfail=1 --disable-warnings --verbose --tb=short
+                        pytest --maxfail=1 --disable-warnings -q --junitxml=report.xml
                         
                         echo "All tests passed!"
                     '''
@@ -160,7 +160,15 @@ pipeline {
     post {
         always {
             echo 'Publishing test results...'
-            junit allowEmptyResults: true, testResults: 'messaging_app/report.xml'
+            script {
+                sh '''
+                    # Ensure report is at workspace root for Jenkins to pick up as 'report.xml'
+                    if [ -f messaging_app/report.xml ]; then
+                        cp messaging_app/report.xml report.xml
+                    fi
+                '''
+            }
+            junit 'report.xml'
             
             script {
                 sh '''
