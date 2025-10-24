@@ -1,0 +1,6 @@
+pytest
+pytest-django
+flake8
+coverage
+dockertool
+docker
