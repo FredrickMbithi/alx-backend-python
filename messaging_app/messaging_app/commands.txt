@@ -1,0 +1,27 @@
+# Commands used to set up Kubernetes Ingress for External Access
+# Task 3: Set Up Kubernetes Ingress for External Access
+
+# 1. Enable ingress addon in minikube
+minikube addons enable ingress
+
+# 2. Apply the ingress configuration
+kubectl apply -f ingress.yaml
+
+# 3. Verify ingress is created
+kubectl get ingress
+
+# 4. Get ingress details
+kubectl describe ingress django-messaging-ingress
+
+# 5. Wait for ingress controller to be ready (nginx)
+kubectl -n ingress-nginx rollout status deploy/ingress-nginx-controller --timeout=180s || echo "Ingress controller may still be starting"
+
+# 6. Add host mapping for local testing
+# Linux/macOS:
+# echo "$(minikube ip) messaging-app.local" | sudo tee -a /etc/hosts
+# Windows (PowerShell as Administrator):
+# $ip = minikube ip; Add-Content -Path C:\Windows\System32\drivers\etc\hosts -Value ("$ip`tmessaging-app.local")
+
+# 7. Test access (after adding to hosts file)
+# curl http://messaging-app.local/
+# curl http://messaging-app.local/api/

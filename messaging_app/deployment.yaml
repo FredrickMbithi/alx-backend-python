@@ -1,13 +1,9 @@
-# Django Messaging App Kubernetes Deployment
-# This file deploys the Django messaging app to Kubernetes cluster
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: django-messaging-app
   labels:
     app: django-messaging-app
-    version: v1.0
 spec:
   replicas: 1
   selector:
@@ -17,43 +13,17 @@ spec:
     metadata:
       labels:
         app: django-messaging-app
-        version: v1.0
     spec:
       containers:
         - name: django-app
           image: messaging-app:latest
-          imagePullPolicy: Never # Use local image for Minikube
           ports:
             - containerPort: 8000
-              name: http
           env:
-            - name: DEBUG
-              value: "True"
-            - name: ALLOWED_HOSTS
-              value: "*"
             - name: DB_ENGINE
               value: "django.db.backends.sqlite3"
             - name: DJANGO_DEBUG
               value: "True"
-          resources:
-            requests:
-              memory: "128Mi"
-              cpu: "100m"
-            limits:
-              memory: "256Mi"
-              cpu: "500m"
-          livenessProbe:
-            httpGet:
-              path: /
-              port: 8000
-            initialDelaySeconds: 30
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /
-              port: 8000
-            initialDelaySeconds: 5
-            periodSeconds: 5
           command: ["python3", "manage.py"]
           args: ["runserver", "0.0.0.0:8000"]
 ---
@@ -66,9 +36,8 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    - port: 80
+    - port: 8000
       targetPort: 8000
       protocol: TCP
-      name: http
   selector:
     app: django-messaging-app

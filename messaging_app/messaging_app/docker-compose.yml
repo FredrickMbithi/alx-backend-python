@@ -1,0 +1,44 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: messaging_app_db
+    restart: always
+    environment:
+      MYSQL_DATABASE: messaging_db
+      MYSQL_DB: messaging_db
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+      MYSQL_ROOT_PASSWORD: rootpassword
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      # Use $$ to escape $ so compose doesn't try to substitute at parse time
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u$$MYSQL_USER -p$$MYSQL_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    container_name: messaging_app_web
+    command: ["sh", "-c", "python3 manage.py migrate && python3 manage.py runserver 0.0.0.0:8000"]
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+    environment:
+      - DB_ENGINE=django.db.backends.mysql
+      - DB_NAME=messaging_db
+      - DB_USER=user
+      - DB_PASSWORD=password
+      - DB_HOST=db
+      - DB_PORT=3306
+
+volumes:
+  mysql_data:
