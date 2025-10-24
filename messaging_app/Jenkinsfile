@@ -1,34 +1,41 @@
 pipeline {
     agent any
-    
+
+    environment {
+        // Consistent virtual environment directory
+        VENV_DIR = 'venv'
+        PYTHON = 'python3' // fallback alias for Linux
+    }
+
     stages {
         stage('Checkout') {
             steps {
                 echo '📦 Checking out code from GitHub...'
-                git branch: 'main', 
-                    credentialsId: 'github-creds', 
+                git(
+                    branch: 'main',
+                    credentialsId: 'github-creds',
                     url: 'https://github.com/FredrickMbithi/alx-backend-python.git'
+                )
             }
         }
-        
+
         stage('Setup Python Environment') {
             steps {
                 echo '🐍 Setting up Python virtual environment...'
                 script {
-                    // Detect OS and activate accordingly
                     if (isUnix()) {
                         sh '''
-                            which python3 || which python
-                            python3 -m venv venv || python -m venv venv
-                            . venv/bin/activate
-                            pip install --upgrade pip
+                            echo "Setting up Python venv..."
+                            ${PYTHON} -m venv ${VENV_DIR} || python -m venv ${VENV_DIR}
+                            . ${VENV_DIR}/bin/activate
+                            pip install --upgrade pip setuptools wheel
                         '''
                     } else {
                         bat '''
-                            where python
-                            python -m venv venv
-                            call venv\\Scripts\\activate
-                            python -m pip install --upgrade pip
+                            echo Setting up Python venv...
+                            python -m venv %VENV_DIR%
+                            call %VENV_DIR%\\Scripts\\activate
+                            python -m pip install --upgrade pip setuptools wheel
                         '''
                     }
                 }
@@ -37,18 +44,51 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                echo '📦 Installing project dependencies...'
+                echo '📦 Installing dependencies...'
                 script {
                     if (isUnix()) {
                         sh '''
-                            . venv/bin/activate
-                            if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+                            . ${VENV_DIR}/bin/activate
+                            if [ -f requirements.txt ]; then
+                                echo "Installing from requirements.txt..."
+                                pip install -r requirements.txt
+                            else
+                                echo "⚠️ No requirements.txt found!"
+                            fi
+                            pip install pytest pytest-django django-filter drf-nested-routers --upgrade
+                            pip freeze
                         '''
                     } else {
                         bat '''
-                            call venv\\Scripts\\activate
-                            if exist requirements.txt pip install -r requirements.txt
+                            call %VENV_DIR%\\Scripts\\activate
+                            if exist requirements.txt (
+                                echo Installing from requirements.txt...
+                                pip install -r requirements.txt
+                            ) else (
+                                echo ⚠️ No requirements.txt found!
+                            )
+                            pip install pytest pytest-django django-filter drf-nested-routers --upgrade
+                            pip freeze
                         '''
+                    }
+                }
+            }
+        }
+
+        stage('Run Migrations') {
+            steps {
+                echo '🛠 Running Django migrations...'
+                script {
+                    if (isUnix()) {
+                        sh """
+                            . ${VENV_DIR}/bin/activate
+                            python manage.py migrate --noinput || echo 'No migrations to apply.'
+                        """
+                    } else {
+                        bat """
+                            call %VENV_DIR%\\Scripts\\activate
+                            python manage.py migrate --noinput || echo No migrations to apply.
+                        """
                     }
                 }
             }
@@ -56,20 +96,18 @@ pipeline {
 
         stage('Run Tests') {
             steps {
-                echo '🧪 Running tests with pytest...'
+                echo '🧪 Running unit tests...'
                 script {
                     if (isUnix()) {
-                        sh '''
-                            . venv/bin/activate
-                            pip install pytest || true
-                            pytest --junitxml=report.xml --verbose
-                        '''
+                        sh """
+                            . ${VENV_DIR}/bin/activate
+                            pytest --junitxml=report.xml --maxfail=1 --disable-warnings -v
+                        """
                     } else {
-                        bat '''
-                            call venv\\Scripts\\activate
-                            pip install pytest
-                            pytest --junitxml=report.xml --verbose
-                        '''
+                        bat """
+                            call %VENV_DIR%\\Scripts\\activate
+                            pytest --junitxml=report.xml --maxfail=1 --disable-warnings -v
+                        """
                     }
                 }
             }
@@ -82,10 +120,10 @@ pipeline {
             junit 'report.xml'
         }
         success {
-            echo '✅ Pipeline completed successfully!'
+            echo '✅ Pipeline completed successfully! Everything is working as expected.'
         }
         failure {
-            echo '❌ Pipeline failed. Check the logs above.'
+            echo '❌ Pipeline failed. Check logs and fix issues before re-running.'
         }
     }
 }
