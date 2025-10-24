@@ -1,244 +1,485 @@
-pipeline {pipeline {pipeline {pipeline {
+// ==============================================================================pipeline {pipeline {pipeline {pipeline {
 
-    agent any
+// Jenkins Declarative Pipeline for Django Messaging App
 
-    agent any
+// ==============================================================================    agent any
+
+// This pipeline automates the build, test, and deployment process for a 
+
+// Django application using MySQL database.    agent any
+
+// ==============================================================================
 
     environment {
 
-        VENV_DIR = 'venv'    agent any    agent any
+pipeline {
+
+    // Specifies this pipeline can run on any available Jenkins agent        VENV_DIR = 'venv'    agent any    agent any
+
+    agent any
 
         PYTHON = 'python3'
 
-        DJANGO_SETTINGS_MODULE = 'messaging_app.settings'    environment {
+    // Environment variables available to all stages in this pipeline
+
+    environment {        DJANGO_SETTINGS_MODULE = 'messaging_app.settings'    environment {
+
+        // Python virtual environment directory
+
+        VENV_DIR = 'venv'        DATABASE_HOST = '127.0.0.1'
+
+        
+
+        // Python executable (python3 for Linux/Unix systems)        DATABASE_PORT = '3306'        VENV_DIR = 'venv'
+
+        PYTHON = 'python3'
+
+                DATABASE_NAME = 'messaging_db'
+
+        // Django settings module - tells Django which settings file to use
+
+        DJANGO_SETTINGS_MODULE = 'messaging_app.settings'        DATABASE_USER = 'messaging_user'        PYTHON = 'python3'
+
+        
+
+        // Database connection parameters for CI/CD testing        DATABASE_PASSWORD = 'password'
 
         DATABASE_HOST = '127.0.0.1'
 
-        DATABASE_PORT = '3306'        VENV_DIR = 'venv'
+        DATABASE_PORT = '3306'    }        DJANGO_SETTINGS_MODULE = 'messaging_app.settings'    environment {    environment {
 
         DATABASE_NAME = 'messaging_db'
 
-        DATABASE_USER = 'messaging_user'        PYTHON = 'python3'
+        DATABASE_USER = 'messaging_user'
 
         DATABASE_PASSWORD = 'password'
 
-    }        DJANGO_SETTINGS_MODULE = 'messaging_app.settings'    environment {    environment {
+    }    stages {        DATABASE_HOST = '127.0.0.1'
 
 
 
-    stages {        DATABASE_HOST = '127.0.0.1'
+    // The sequential stages of our CI/CD pipeline        stage('Checkout') {
+
+    stages {
+
+                    steps {        DATABASE_PORT = '3306'        VENV_DIR = 'venv'        // Consistent virtual environment directory
 
         stage('Checkout') {
 
-            steps {        DATABASE_PORT = '3306'        VENV_DIR = 'venv'        // Consistent virtual environment directory
+            steps {                echo '📦 Checking out code from GitHub...'
 
                 echo '📦 Checking out code from GitHub...'
 
-                git branch: 'main',        DATABASE_NAME = 'messaging_db'
+                git branch: 'main',                git branch: 'main',        DATABASE_NAME = 'messaging_db'
 
                     credentialsId: 'github-creds',
 
-                    url: 'https://github.com/FredrickMbithi/alx-backend-python.git'        DATABASE_USER = 'messaging_user'        PYTHON = 'python3'        VENV_DIR = 'venv'
+                    url: 'https://github.com/FredrickMbithi/alx-backend-python.git'                    credentialsId: 'github-creds',
 
             }
 
-        }        DATABASE_PASSWORD = 'password'
+        }                    url: 'https://github.com/FredrickMbithi/alx-backend-python.git'        DATABASE_USER = 'messaging_user'        PYTHON = 'python3'        VENV_DIR = 'venv'
 
 
 
-        stage('Install System Dependencies') {    }        DJANGO_SETTINGS_MODULE = 'messaging_app.settings'        PYTHON = 'python3' // fallback alias for Linux
+        stage('Install System Dependencies') {            }
 
             steps {
 
-                echo '🔧 Installing system packages for mysqlclient...'
+                echo '🔧 Installing system packages for mysqlclient...'        }        DATABASE_PASSWORD = 'password'
 
                 sh '''
 
-                    set -e    stages {                // Ensure pytest-django knows which settings to use
+                    set -e
 
                     if command -v apt-get >/dev/null 2>&1; then
 
-                        echo "Using apt-get (Debian/Ubuntu)..."        stage('Checkout') {
+                        echo "Using apt-get (Debian/Ubuntu)..."        stage('Install System Dependencies') {    }        DJANGO_SETTINGS_MODULE = 'messaging_app.settings'        PYTHON = 'python3' // fallback alias for Linux
 
                         export DEBIAN_FRONTEND=noninteractive
 
-                        apt-get update -qq            steps {        // Database configuration for CI        DJANGO_SETTINGS_MODULE = 'messaging_app.settings'
+                        apt-get update -qq            steps {
 
                         apt-get install -y --no-install-recommends \
 
-                            build-essential \                echo '📦 Checking out code from GitHub...'
+                            build-essential \                echo '🔧 Installing system packages for mysqlclient...'
 
                             gcc \
 
-                            python3-dev \                git branch: 'main',        DATABASE_HOST = '127.0.0.1'    }
+                            python3-dev \                sh '''
 
                             pkg-config \
 
-                            default-libmysqlclient-dev                    credentialsId: 'github-creds',
+                            default-libmysqlclient-dev                    set -e    stages {                // Ensure pytest-django knows which settings to use
 
                         echo "✅ System dependencies installed"
 
-                    elif command -v apk >/dev/null 2>&1; then                    url: 'https://github.com/FredrickMbithi/alx-backend-python.git'        DATABASE_PORT = '3306'
+                    elif command -v apk >/dev/null 2>&1; then                    if command -v apt-get >/dev/null 2>&1; then
 
                         echo "Using apk (Alpine)..."
 
-                        apk add --no-cache \            }
+                        apk add --no-cache \                        echo "Using apt-get (Debian/Ubuntu)..."        stage('Checkout') {
 
                             build-base \
 
-                            python3-dev \        }        DATABASE_NAME = 'messaging_db'    stages {
+                            python3-dev \                        export DEBIAN_FRONTEND=noninteractive
 
                             pkgconfig \
 
-                            mariadb-connector-c-dev
+                            mariadb-connector-c-dev                        apt-get update -qq            steps {        // Database configuration for CI        DJANGO_SETTINGS_MODULE = 'messaging_app.settings'
 
                         echo "✅ System dependencies installed"
 
-                    elif command -v yum >/dev/null 2>&1; then        stage('Install System Dependencies') {        DATABASE_USER = 'messaging_user'                stage('Install System Dependencies') {
+                    elif command -v yum >/dev/null 2>&1; then                        apt-get install -y --no-install-recommends \
 
                         echo "Using yum (RHEL/CentOS)..."
 
-                        yum install -y \            steps {
+                        yum install -y \                            build-essential \                echo '📦 Checking out code from GitHub...'
 
                             gcc \
 
-                            python3-devel \                echo '🔧 Installing system packages for mysqlclient...'        DATABASE_PASSWORD = 'password'                        steps {
+                            python3-devel \                            gcc \
 
                             pkgconfig \
 
-                            mysql-devel                sh '''
+                            mysql-devel                            python3-dev \                git branch: 'main',        DATABASE_HOST = '127.0.0.1'    }
 
                         echo "✅ System dependencies installed"
 
-                    else                    set -e    }                                echo '🧩 Installing OS packages for mysqlclient build...'
+                    else                            pkg-config \
 
                         echo "⚠️ Unknown package manager"
 
-                        exit 1                    if command -v apt-get >/dev/null 2>&1; then
+                        exit 1                            default-libmysqlclient-dev                    credentialsId: 'github-creds',
 
                     fi
 
-                '''                        echo "Using apt-get (Debian/Ubuntu)..."                                script {
+                '''                        echo "✅ System dependencies installed"
 
             }
 
-        }                        export DEBIAN_FRONTEND=noninteractive
+        }                    elif command -v apk >/dev/null 2>&1; then                    url: 'https://github.com/FredrickMbithi/alx-backend-python.git'        DATABASE_PORT = '3306'
 
 
 
-        stage('Setup Python Environment') {                        apt-get update -qq    stages {                                        if (isUnix()) {
-
-            steps {
-
-                echo '🐍 Creating Python virtual environment...'                        apt-get install -y --no-install-recommends \
-
-                dir('messaging_app') {
-
-                    sh '''                            build-essential \        stage('Checkout') {                                                sh '''
-
-                        ${PYTHON} -m venv ${VENV_DIR}
-
-                        . ${VENV_DIR}/bin/activate                            gcc \
-
-                        pip install --upgrade pip setuptools wheel
-
-                        echo "✅ Virtual environment ready"                            python3-dev \            steps {                                                        set -e
-
-                    '''
-
-                }                            pkg-config \
-
-            }
-
-        }                            default-libmysqlclient-dev                echo '📦 Checking out code from GitHub...'                                                        if command -v apt-get >/dev/null 2>&1; then
-
-
-
-        stage('Install Python Dependencies') {                        echo "✅ System dependencies installed"
+        stage('Setup Python Environment') {                        echo "Using apk (Alpine)..."
 
             steps {
 
-                echo '📦 Installing Python packages...'                    elif command -v apk >/dev/null 2>&1; then                git(                                                            echo "Using apt-get..."
+                echo '🐍 Creating Python virtual environment...'                        apk add --no-cache \            }
 
-                dir('messaging_app') {
+                // Navigate into the messaging_app directory where manage.py lives
 
-                    sh '''                        echo "Using apk (Alpine)..."
+                dir('messaging_app') {                            build-base \
+
+                    sh '''
+
+                        ${PYTHON} -m venv ${VENV_DIR}                            python3-dev \        }        DATABASE_NAME = 'messaging_db'    stages {
 
                         . ${VENV_DIR}/bin/activate
 
-                                                apk add --no-cache \                    branch: 'main',                                                            sudo -n true 2>/dev/null || true
+                        pip install --upgrade pip setuptools wheel                            pkgconfig \
 
-                        if [ -f requirements.txt ]; then
+                        echo "✅ Virtual environment ready"
 
-                            pip install -r requirements.txt                            build-base \
+                    '''                            mariadb-connector-c-dev
 
-                        else
+                }
 
-                            echo "❌ requirements.txt not found"                            python3-dev \                    credentialsId: 'github-creds',                                                            export DEBIAN_FRONTEND=noninteractive
+            }                        echo "✅ System dependencies installed"
 
-                            exit 1
+        }
 
-                        fi                            pkgconfig \
+                    elif command -v yum >/dev/null 2>&1; then        stage('Install System Dependencies') {        DATABASE_USER = 'messaging_user'                stage('Install System Dependencies') {
+
+        stage('Install Python Dependencies') {
+
+            steps {                        echo "Using yum (RHEL/CentOS)..."
+
+                echo '📦 Installing Python packages...'
+
+                dir('messaging_app') {                        yum install -y \            steps {
+
+                    sh '''
+
+                        . ${VENV_DIR}/bin/activate                            gcc \
 
                         
 
-                        pip install --upgrade pytest pytest-django parameterized                            mariadb-connector-c-dev                    url: 'https://github.com/FredrickMbithi/alx-backend-python.git'                                                            apt-get update -y
+                        if [ -f requirements.txt ]; then                            python3-devel \                echo '🔧 Installing system packages for mysqlclient...'        DATABASE_PASSWORD = 'password'                        steps {
+
+                            pip install -r requirements.txt
+
+                        else                            pkgconfig \
+
+                            echo "❌ requirements.txt not found"
+
+                            exit 1                            mysql-devel                sh '''
+
+                        fi
+
+                                                echo "✅ System dependencies installed"
+
+                        # Ensure test dependencies are present
+
+                        pip install --upgrade pytest pytest-django parameterized                    else                    set -e    }                                echo '🧩 Installing OS packages for mysqlclient build...'
+
+                        
+
+                        # Verify mysqlclient installed correctly                        echo "⚠️ Unknown package manager"
 
                         python -c "import MySQLdb; print('✅ mysqlclient OK')"
 
-                        pip freeze                        echo "✅ System dependencies installed"
+                                                exit 1                    if command -v apt-get >/dev/null 2>&1; then
+
+                        # Show all installed packages for debugging
+
+                        pip freeze                    fi
 
                     '''
 
-                }                    elif command -v yum >/dev/null 2>&1; then                )                                                            apt-get install -y --no-install-recommends \
+                }                '''                        echo "Using apt-get (Debian/Ubuntu)..."                                script {
 
             }
 
-        }                        echo "Using yum (RHEL/CentOS)..."
+        }            }
 
 
 
-        stage('Start MySQL Container') {                        yum install -y \            }                                                                build-essential \
+        stage('Start MySQL Container') {        }                        export DEBIAN_FRONTEND=noninteractive
 
             steps {
 
-                echo '🐬 Starting MySQL database...'                            gcc \
+                echo '🐬 Starting MySQL database...'
 
                 sh '''
 
-                    if command -v docker >/dev/null 2>&1; then                            python3-devel \        }                                                                gcc \
+                    if command -v docker >/dev/null 2>&1; then        stage('Setup Python Environment') {                        apt-get update -qq    stages {                                        if (isUnix()) {
 
-                        docker rm -f ci-mysql 2>/dev/null || true
+                        # Remove any existing container with same name
 
-                        docker run -d \                            pkgconfig \
+                        docker rm -f ci-mysql 2>/dev/null || true            steps {
 
-                            --name ci-mysql \
+                        
 
-                            -p 3306:3306 \                            mysql-devel                                                                python3-dev \
+                        # Start MySQL 8.0 container                echo '🐍 Creating Python virtual environment...'                        apt-get install -y --no-install-recommends \
 
-                            -e MYSQL_DATABASE=${DATABASE_NAME} \
+                        docker run -d \
 
-                            -e MYSQL_USER=${DATABASE_USER} \                        echo "✅ System dependencies installed"
+                            --name ci-mysql \                dir('messaging_app') {
 
-                            -e MYSQL_PASSWORD=${DATABASE_PASSWORD} \
+                            -p 3306:3306 \
 
-                            -e MYSQL_ROOT_PASSWORD=${DATABASE_PASSWORD} \                    else        stage('Install System Dependencies') {                                                                pkg-config \
+                            -e MYSQL_DATABASE=${DATABASE_NAME} \                    sh '''                            build-essential \        stage('Checkout') {                                                sh '''
 
-                            --health-cmd='mysqladmin ping -h 127.0.0.1 -uroot -p${DATABASE_PASSWORD}' \
+                            -e MYSQL_USER=${DATABASE_USER} \
 
-                            --health-interval=5s \                        echo "⚠️ Unknown package manager"
+                            -e MYSQL_PASSWORD=${DATABASE_PASSWORD} \                        ${PYTHON} -m venv ${VENV_DIR}
 
-                            --health-timeout=3s \
+                            -e MYSQL_ROOT_PASSWORD=${DATABASE_PASSWORD} \
 
-                            --health-retries=30 \                        exit 1            steps {                                                                default-libmysqlclient-dev
+                            --health-cmd='mysqladmin ping -h 127.0.0.1 -uroot -p${DATABASE_PASSWORD}' \                        . ${VENV_DIR}/bin/activate                            gcc \
 
-                            mysql:8.0
+                            --health-interval=5s \
 
-                                            fi
+                            --health-timeout=3s \                        pip install --upgrade pip setuptools wheel
 
-                        echo "Waiting for MySQL..."
+                            --health-retries=30 \
 
-                        for i in $(seq 1 60); do                '''                echo '🔧 Installing system packages required for mysqlclient...'                                                        elif command -v apk >/dev/null 2>&1; then
+                            mysql:8.0                        echo "✅ Virtual environment ready"                            python3-dev \            steps {                                                        set -e
+
+                        
+
+                        # Wait for MySQL to be healthy before proceeding                    '''
+
+                        echo "Waiting for MySQL to be ready..."
+
+                        for i in $(seq 1 60); do                }                            pkg-config \
+
+                            status=$(docker inspect --format='{{.State.Health.Status}}' ci-mysql 2>/dev/null || echo "starting")
+
+                            if [ "$status" = "healthy" ]; then            }
+
+                                echo "✅ MySQL is ready"
+
+                                sleep 2        }                            default-libmysqlclient-dev                echo '📦 Checking out code from GitHub...'                                                        if command -v apt-get >/dev/null 2>&1; then
+
+                                exit 0
+
+                            fi
+
+                            sleep 2
+
+                        done        stage('Install Python Dependencies') {                        echo "✅ System dependencies installed"
+
+                        echo "❌ MySQL failed to start within timeout"
+
+                        exit 1            steps {
+
+                    else
+
+                        echo "⚠️ Docker not available - skipping MySQL container"                echo '📦 Installing Python packages...'                    elif command -v apk >/dev/null 2>&1; then                git(                                                            echo "Using apt-get..."
+
+                    fi
+
+                '''                dir('messaging_app') {
+
+            }
+
+        }                    sh '''                        echo "Using apk (Alpine)..."
+
+
+
+        stage('Run Migrations') {                        . ${VENV_DIR}/bin/activate
+
+            steps {
+
+                echo '🛠️ Running Django database migrations...'                                                apk add --no-cache \                    branch: 'main',                                                            sudo -n true 2>/dev/null || true
+
+                dir('messaging_app') {
+
+                    sh '''                        if [ -f requirements.txt ]; then
+
+                        . ${VENV_DIR}/bin/activate
+
+                                                    pip install -r requirements.txt                            build-base \
+
+                        # Check database connectivity
+
+                        python manage.py check --database default                        else
+
+                        
+
+                        # Run migrations                            echo "❌ requirements.txt not found"                            python3-dev \                    credentialsId: 'github-creds',                                                            export DEBIAN_FRONTEND=noninteractive
+
+                        python manage.py migrate --noinput
+
+                                                    exit 1
+
+                        echo "✅ Migrations completed"
+
+                    '''                        fi                            pkgconfig \
+
+                }
+
+            }                        
+
+        }
+
+                        pip install --upgrade pytest pytest-django parameterized                            mariadb-connector-c-dev                    url: 'https://github.com/FredrickMbithi/alx-backend-python.git'                                                            apt-get update -y
+
+        stage('Run Tests') {
+
+            steps {                        python -c "import MySQLdb; print('✅ mysqlclient OK')"
+
+                echo '🧪 Running pytest test suite...'
+
+                dir('messaging_app') {                        pip freeze                        echo "✅ System dependencies installed"
+
+                    sh '''
+
+                        . ${VENV_DIR}/bin/activate                    '''
+
+                        
+
+                        # Run tests with pytest                }                    elif command -v yum >/dev/null 2>&1; then                )                                                            apt-get install -y --no-install-recommends \
+
+                        pytest . \
+
+                            --junitxml=report.xml \            }
+
+                            --maxfail=1 \
+
+                            --disable-warnings \        }                        echo "Using yum (RHEL/CentOS)..."
+
+                            --verbose
+
+                        
+
+                        echo "✅ All tests passed"
+
+                    '''        stage('Start MySQL Container') {                        yum install -y \            }                                                                build-essential \
+
+                }
+
+            }            steps {
+
+        }
+
+    }                echo '🐬 Starting MySQL database...'                            gcc \
+
+
+
+    // Post-build actions that always run regardless of success or failure                sh '''
+
+    post {
+
+        always {                    if command -v docker >/dev/null 2>&1; then                            python3-devel \        }                                                                gcc \
+
+            echo '📊 Publishing test results...'
+
+                                    docker rm -f ci-mysql 2>/dev/null || true
+
+            // Publish JUnit test results to Jenkins
+
+            junit allowEmptyResults: true, testResults: 'messaging_app/report.xml'                        docker run -d \                            pkgconfig \
+
+            
+
+            // Clean up MySQL container                            --name ci-mysql \
+
+            sh '''
+
+                if command -v docker >/dev/null 2>&1; then                            -p 3306:3306 \                            mysql-devel                                                                python3-dev \
+
+                    echo "🧹 Cleaning up MySQL container..."
+
+                    docker rm -f ci-mysql 2>/dev/null || true                            -e MYSQL_DATABASE=${DATABASE_NAME} \
+
+                fi
+
+            '''                            -e MYSQL_USER=${DATABASE_USER} \                        echo "✅ System dependencies installed"
+
+        }
+
+                                    -e MYSQL_PASSWORD=${DATABASE_PASSWORD} \
+
+        success {
+
+            echo '✅ Pipeline completed successfully! 🎉'                            -e MYSQL_ROOT_PASSWORD=${DATABASE_PASSWORD} \                    else        stage('Install System Dependencies') {                                                                pkg-config \
+
+        }
+
+                                    --health-cmd='mysqladmin ping -h 127.0.0.1 -uroot -p${DATABASE_PASSWORD}' \
+
+        failure {
+
+            echo '❌ Pipeline failed - review the logs above to identify the issue'                            --health-interval=5s \                        echo "⚠️ Unknown package manager"
+
+        }
+
+                                    --health-timeout=3s \
+
+        cleanup {
+
+            echo '🧹 Cleaning up workspace artifacts...'                            --health-retries=30 \                        exit 1            steps {                                                                default-libmysqlclient-dev
+
+            cleanWs deleteDirs: true, patterns: [
+
+                [pattern: 'messaging_app/venv/**', type: 'INCLUDE'],                            mysql:8.0
+
+                [pattern: 'messaging_app/**/__pycache__/**', type: 'INCLUDE'],
+
+                [pattern: 'messaging_app/.pytest_cache/**', type: 'INCLUDE']                                            fi
+
+            ]
+
+        }                        echo "Waiting for MySQL..."
+
+    }
+
+}                        for i in $(seq 1 60); do                '''                echo '🔧 Installing system packages required for mysqlclient...'                                                        elif command -v apk >/dev/null 2>&1; then
+
 
                             status=$(docker inspect --format='{{.State.Health.Status}}' ci-mysql 2>/dev/null || echo "starting")
 

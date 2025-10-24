@@ -1,0 +1,106 @@
+version: '3.8'
+
+services:
+  # Jenkins CI/CD Server
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: jenkins-server
+    restart: unless-stopped
+    privileged: true
+    user: root
+    ports:
+      - "8080:8080"      # Jenkins Web UI
+      - "50000:50000"    # Jenkins agent port
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./messaging_app:/workspace/messaging_app:ro
+    environment:
+      - JENKINS_OPTS=--prefix=/jenkins
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
+    networks:
+      - ci-network
+    depends_on:
+      mysql-ci:
+        condition: service_healthy
+
+  # MySQL Database for CI/CD Testing
+  mysql-ci:
+    image: mysql:8.0
+    container_name: mysql-ci
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: messaging_db
+      MYSQL_USER: messaging_user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3307:3306"      # Exposed on host as 3307 to avoid conflict
+    volumes:
+      - mysql_ci_data:/var/lib/mysql
+    networks:
+      - ci-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Django Application (for local development/testing)
+  django-app:
+    build:
+      context: ./messaging_app
+      dockerfile: Dockerfile
+    container_name: django-messaging-app
+    restart: unless-stopped
+    command: sh -c "python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./messaging_app:/app
+    environment:
+      - DATABASE_HOST=mysql-app
+      - DATABASE_PORT=3306
+      - DATABASE_NAME=messaging_db
+      - DATABASE_USER=messaging_user
+      - DATABASE_PASSWORD=password
+      - DEBUG=True
+    networks:
+      - ci-network
+    depends_on:
+      mysql-app:
+        condition: service_healthy
+
+  # MySQL Database for Django Application
+  mysql-app:
+    image: mysql:8.0
+    container_name: mysql-app
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: messaging_db
+      MYSQL_USER: messaging_user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_app_data:/var/lib/mysql
+    networks:
+      - ci-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  jenkins_home:
+    driver: local
+  mysql_ci_data:
+    driver: local
+  mysql_app_data:
+    driver: local
+
+networks:
+  ci-network:
+    driver: bridge
