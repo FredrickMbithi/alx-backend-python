@@ -4,48 +4,81 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                echo 'Checking out code from GitHub...'
-                git credentialsId: 'github-creds', 
-                    url: 'https://github.com/FredrickMbithi/alx-backend-python.git',
-                    branch: 'main'
+                echo '📦 Checking out code from GitHub...'
+                git branch: 'main', 
+                    credentialsId: 'github-creds', 
+                    url: 'https://github.com/FredrickMbithi/alx-backend-python.git'
             }
         }
         
         stage('Setup Python Environment') {
             steps {
-                echo 'Setting up Python virtual environment...'
-                sh '''
-                    python3 -m venv venv
-                    . venv/bin/activate
-                    pip install --upgrade pip
-                '''
+                echo '🐍 Setting up Python virtual environment...'
+                script {
+                    // Detect OS and activate accordingly
+                    if (isUnix()) {
+                        sh '''
+                            which python3 || which python
+                            python3 -m venv venv || python -m venv venv
+                            . venv/bin/activate
+                            pip install --upgrade pip
+                        '''
+                    } else {
+                        bat '''
+                            where python
+                            python -m venv venv
+                            call venv\\Scripts\\activate
+                            python -m pip install --upgrade pip
+                        '''
+                    }
+                }
             }
         }
-        
+
         stage('Install Dependencies') {
             steps {
-                echo 'Installing project dependencies...'
-                sh '''
-                    . venv/bin/activate
-                    pip install -r requirements.txt
-                '''
+                echo '📦 Installing project dependencies...'
+                script {
+                    if (isUnix()) {
+                        sh '''
+                            . venv/bin/activate
+                            if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+                        '''
+                    } else {
+                        bat '''
+                            call venv\\Scripts\\activate
+                            if exist requirements.txt pip install -r requirements.txt
+                        '''
+                    }
+                }
             }
         }
-        
+
         stage('Run Tests') {
             steps {
-                echo 'Running tests with pytest...'
-                sh '''
-                    . venv/bin/activate
-                    pytest --junitxml=report.xml --verbose
-                '''
+                echo '🧪 Running tests with pytest...'
+                script {
+                    if (isUnix()) {
+                        sh '''
+                            . venv/bin/activate
+                            pip install pytest || true
+                            pytest --junitxml=report.xml --verbose
+                        '''
+                    } else {
+                        bat '''
+                            call venv\\Scripts\\activate
+                            pip install pytest
+                            pytest --junitxml=report.xml --verbose
+                        '''
+                    }
+                }
             }
         }
     }
-    
+
     post {
         always {
-            echo 'Publishing test results...'
+            echo '📊 Publishing test results...'
             junit 'report.xml'
         }
         success {
