@@ -70,9 +70,18 @@ pipeline {
                 echo '🐍 Creating Python virtual environment...'
                 dir('messaging_app') {
                     sh '''
+                        set -e  # Exit on any error
+                        
+                        echo "Creating virtual environment..."
                         ${PYTHON} -m venv ${VENV_DIR}
+                        
+                        echo "Activating virtual environment..."
                         . ${VENV_DIR}/bin/activate
+                        
+                        echo "Upgrading pip, setuptools, and wheel..."
                         pip install --upgrade pip setuptools wheel
+                        
+                        echo "✅ Virtual environment ready"
                     '''
                 }
             }
@@ -83,14 +92,15 @@ pipeline {
                 echo '📦 Installing Python packages...'
                 dir('messaging_app') {
                     sh '''
+                        set -e  # Exit on any error
                         . ${VENV_DIR}/bin/activate
                         
                         if [ -f requirements.txt ]; then
                             echo "Installing from requirements.txt..."
                             pip install -r requirements.txt
                         else
-                            echo "⚠️ No requirements.txt found, installing basic deps"
-                            pip install Django pytest pytest-django
+                            echo "❌ requirements.txt not found!"
+                            exit 1
                         fi
                         
                         # Ensure test dependencies are present
@@ -99,7 +109,7 @@ pipeline {
                         
                         # Verify mysqlclient was installed successfully
                         echo "Verifying mysqlclient installation..."
-                        python -c "import MySQLdb; print('✅ mysqlclient imported successfully')" || echo "⚠️ mysqlclient not available"
+                        python -c "import MySQLdb; print('✅ mysqlclient imported successfully')"
                         
                         echo "📋 Installed packages:"
                         pip freeze
@@ -111,54 +121,49 @@ pipeline {
         stage('Start MySQL Container') {
             steps {
                 echo '🐬 Starting MySQL database...'
-                // Note: Docker socket must be mounted in Jenkins for this to work
-                // Alternative: Use external MySQL or docker-compose setup
                 sh '''
-                    # Install Docker CLI if not present (lightweight)
+                    set -e  # Exit on any error
+                    
+                    # Install Docker CLI if not present
                     if ! command -v docker >/dev/null 2>&1; then
                         echo "Installing Docker CLI..."
                         apt-get update -qq
                         apt-get install -y --no-install-recommends docker.io
                     fi
                     
-                    if command -v docker >/dev/null 2>&1; then
-                        echo "Cleaning up any existing MySQL container..."
-                        docker rm -f ci-mysql 2>/dev/null || true
+                    echo "Cleaning up any existing MySQL container..."
+                    docker rm -f ci-mysql 2>/dev/null || true
+                    
+                    echo "Starting MySQL 8.0 container..."
+                    docker run -d \
+                        --name ci-mysql \
+                        --network host \
+                        -e MYSQL_DATABASE=${DATABASE_NAME} \
+                        -e MYSQL_USER=${DATABASE_USER} \
+                        -e MYSQL_PASSWORD=${DATABASE_PASSWORD} \
+                        -e MYSQL_ROOT_PASSWORD=${DATABASE_PASSWORD} \
+                        --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -p${DATABASE_PASSWORD}" \
+                        --health-interval=5s \
+                        --health-timeout=3s \
+                        --health-retries=30 \
+                        mysql:8.0
+                    
+                    echo "Waiting for MySQL to be healthy..."
+                    for i in $(seq 1 60); do
+                        status=$(docker inspect --format='{{.State.Health.Status}}' ci-mysql 2>/dev/null || echo "starting")
+                        echo "Attempt $i/60: MySQL status = $status"
                         
-                        echo "Starting MySQL 8.0 container..."
-                        docker run -d \
-                            --name ci-mysql \
-                            --network host \
-                            -e MYSQL_DATABASE=${DATABASE_NAME} \
-                            -e MYSQL_USER=${DATABASE_USER} \
-                            -e MYSQL_PASSWORD=${DATABASE_PASSWORD} \
-                            -e MYSQL_ROOT_PASSWORD=${DATABASE_PASSWORD} \
-                            --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -p${DATABASE_PASSWORD}" \
-                            --health-interval=5s \
-                            --health-timeout=3s \
-                            --health-retries=30 \
-                            mysql:8.0
-                        
-                        echo "Waiting for MySQL to be healthy..."
-                        for i in $(seq 1 60); do
-                            status=$(docker inspect --format='{{.State.Health.Status}}' ci-mysql 2>/dev/null || echo "starting")
-                            echo "Attempt $i/60: MySQL status = $status"
-                            
-                            if [ "$status" = "healthy" ]; then
-                                echo "✅ MySQL is ready and healthy!"
-                                sleep 3
-                                exit 0
-                            fi
+                        if [ "$status" = "healthy" ]; then
+                            echo "✅ MySQL is ready and healthy!"
                             sleep 3
-                        done
-                        
-                        echo "❌ MySQL failed to become healthy within timeout"
-                        docker logs ci-mysql
-                        exit 1
-                    else
-                        echo "⚠️ Docker not available - skipping MySQL container setup"
-                        echo "Tests may fail if MySQL is required"
-                    fi
+                            exit 0
+                        fi
+                        sleep 3
+                    done
+                    
+                    echo "❌ MySQL failed to become healthy within timeout"
+                    docker logs ci-mysql
+                    exit 1
                 '''
             }
         }
@@ -168,15 +173,16 @@ pipeline {
                 echo '🛠️ Running Django migrations...'
                 dir('messaging_app') {
                     sh '''
+                        set -e  # Exit on any error
                         . ${VENV_DIR}/bin/activate
                         
                         echo "Checking database connectivity..."
-                        python manage.py check --database default || echo "⚠️ Database check failed"
+                        python manage.py check --database default
                         
                         echo "Running migrations..."
                         python manage.py migrate --noinput
                         
-                        echo "✅ Migrations completed"
+                        echo "✅ Migrations completed successfully"
                     '''
                 }
             }
@@ -187,6 +193,7 @@ pipeline {
                 echo '🧪 Running pytest test suite...'
                 dir('messaging_app') {
                     sh '''
+                        set -e  # Exit on any error
                         . ${VENV_DIR}/bin/activate
                         
                         echo "Running tests with pytest..."
@@ -195,9 +202,10 @@ pipeline {
                             --maxfail=1 \
                             --disable-warnings \
                             --verbose \
-                            --tb=short
+                            --tb=short \
+                            -v
                         
-                        echo "✅ All tests passed!"
+                        echo "✅ All tests passed successfully!"
                     '''
                 }
             }
