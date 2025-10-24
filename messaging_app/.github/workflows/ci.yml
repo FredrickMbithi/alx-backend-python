@@ -1,0 +1,257 @@
+name: CI - Tests, Lint, Coverage
+
+on:
+  push:
+    branches: [ '**' ]
+  pull_request:
+    branches: [ '**' ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:5.7
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: messaging_db
+          MYSQL_USER: messaging_user
+          MYSQL_PASSWORD: password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping --silent"
+          --health-interval=10s --health-timeout=5s --health-retries=3
+
+    env:
+      DJANGO_SETTINGS_MODULE: messaging_app.settings
+      DATABASE_HOST: 127.0.0.1
+      DATABASE_PORT: 3306
+      DATABASE_NAME: messaging_db
+      DATABASE_USER: messaging_user
+      DATABASE_PASSWORD: password
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f messaging_app/requirements.txt ]; then python -m pip install -r messaging_app/requirements.txt; fi
+          python -m pip install pytest pytest-django flake8 coverage
+
+      - name: Lint with flake8
+        run: |
+          flake8 messaging_app
+
+      - name: Run tests with coverage
+        run: |
+          # Wait for MySQL to be ready (if tests use it)
+          for i in {1..30}; do mysqladmin ping -h 127.0.0.1 -P 3306 --silent && break || sleep 1; done
+          coverage run -m pytest messaging_app --junitxml=reports/report.xml
+
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-report
+          path: reports/report.xml
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.xml
+name: CI - Testing and Code Quality
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: messaging_db
+          MYSQL_USER: messaging_user
+          MYSQL_PASSWORD: password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ppassword"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: 📥 Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            gcc \
+            python3-dev \
+            pkg-config \
+            default-libmysqlclient-dev
+
+      - name: 📦 Install Python dependencies
+        working-directory: ./messaging_app
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+          pip install pytest pytest-django pytest-cov flake8 coverage
+
+      - name: 🔍 Wait for MySQL to be ready
+        run: |
+          for i in {1..30}; do
+            if mysqladmin ping -h 127.0.0.1 -uroot -ppassword --silent; then
+              echo "✅ MySQL is ready!"
+              break
+            fi
+            echo "Waiting for MySQL... ($i/30)"
+            sleep 2
+          done
+
+      - name: 🛠️ Run Django migrations
+        working-directory: ./messaging_app
+        env:
+          DATABASE_HOST: 127.0.0.1
+          DATABASE_PORT: 3306
+          DATABASE_NAME: messaging_db
+          DATABASE_USER: messaging_user
+          DATABASE_PASSWORD: password
+          DJANGO_SETTINGS_MODULE: messaging_app.settings
+        run: |
+          python manage.py check --database default
+          python manage.py migrate --noinput
+
+      - name: 🧪 Run tests with coverage
+        working-directory: ./messaging_app
+        env:
+          DATABASE_HOST: 127.0.0.1
+          DATABASE_PORT: 3306
+          DATABASE_NAME: messaging_db
+          DATABASE_USER: messaging_user
+          DATABASE_PASSWORD: password
+          DJANGO_SETTINGS_MODULE: messaging_app.settings
+        run: |
+          pytest chats/ \
+            --junitxml=test-results.xml \
+            --cov=chats \
+            --cov-report=html \
+            --cov-report=xml \
+            --cov-report=term \
+            --verbose
+
+      - name: 📊 Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: messaging_app/test-results.xml
+
+      - name: 📈 Upload coverage report (HTML)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-html
+          path: messaging_app/htmlcov/
+
+      - name: 📈 Upload coverage report (XML)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-xml
+          path: messaging_app/coverage.xml
+
+      - name: 📉 Display coverage summary
+        if: always()
+        working-directory: ./messaging_app
+        run: |
+          coverage report --show-missing
+
+  lint:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: 📦 Install flake8
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8
+
+      - name: 🔍 Run flake8 linting
+        working-directory: ./messaging_app
+        run: |
+          echo "Running flake8 on Django project..."
+          flake8 . \
+            --count \
+            --select=E9,F63,F7,F82 \
+            --show-source \
+            --statistics \
+            --exclude=venv,migrations,__pycache__,.git,*.pyc,*.egg-info,htmlcov,.pytest_cache
+
+          echo "Running full flake8 check..."
+          flake8 . \
+            --count \
+            --max-complexity=10 \
+            --max-line-length=127 \
+            --statistics \
+            --exclude=venv,migrations,__pycache__,.git,*.pyc,*.egg-info,htmlcov,.pytest_cache \
+            || echo "⚠️ Linting warnings found (not failing build)"
+
+      - name: ✅ Linting completed
+        run: echo "Code quality checks completed!"
+
+  summary:
+    name: Build Summary
+    runs-on: ubuntu-latest
+    needs: [test, lint]
+    if: always()
+
+    steps:
+      - name: 📋 Check build status
+        run: |
+          echo "==================================="
+          echo "CI Pipeline Summary"
+          echo "==================================="
+          echo "Tests: ${{ needs.test.result }}"
+          echo "Linting: ${{ needs.lint.result }}"
+          echo "==================================="
+
+          if [ "${{ needs.test.result }}" == "failure" ] || [ "${{ needs.lint.result }}" == "failure" ]; then
+            echo "❌ Build failed"
+            exit 1
+          else
+            echo "✅ All checks passed!"
+          fi

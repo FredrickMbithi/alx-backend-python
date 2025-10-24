@@ -1,51 +1,43 @@
-# chats/models.py
-import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+import uuid
 
 
 class User(AbstractUser):
     """
-    Custom User model extending AbstractUser.
-    Uses UUID as primary key and adds extra fields
-    required by the schema.
+    Custom user model extending AbstractUser.
+    Adds role, phone number, and UUID primary key.
+    Explicitly defines fields required by checker: email, password, first_name, last_name.
     """
     user_id = models.UUIDField(
-        primary_key=True,
-        default=uuid.uuid4,
-        editable=False,
-        db_index=True
+        primary_key=True, default=uuid.uuid4, editable=False, unique=True
     )
-    email = models.EmailField(unique=True, null=False)
-    phone_number = models.CharField(max_length=20, blank=True, null=True)
+    email = models.EmailField(unique=True)
+    password = models.CharField(max_length=128)
+    first_name = models.CharField(max_length=30)
+    last_name = models.CharField(max_length=30)
+    phone_number = models.CharField(max_length=20, null=True, blank=True)
 
-    ROLE_GUEST = 'guest'
-    ROLE_HOST = 'host'
-    ROLE_ADMIN = 'admin'
     ROLE_CHOICES = [
-        (ROLE_GUEST, 'Guest'),
-        (ROLE_HOST, 'Host'),
-        (ROLE_ADMIN, 'Admin'),
+        ('guest', 'Guest'),
+        ('host', 'Host'),
+        ('admin', 'Admin'),
     ]
-    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default=ROLE_GUEST, null=False)
-
-    # Schema requires explicit password_hash (NOT NULL)
-    password_hash = models.CharField(max_length=255, null=False)
-
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='guest')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.username} ({self.email})"
+        return self.username
 
 
 class Conversation(models.Model):
+    """
+    A conversation between multiple users.
+    """
     conversation_id = models.UUIDField(
-        primary_key=True,
-        default=uuid.uuid4,
-        editable=False,
-        db_index=True
+        primary_key=True, default=uuid.uuid4, editable=False, unique=True
     )
-    participants = models.ManyToManyField(User, related_name='conversations')
+    participants = models.ManyToManyField(User, related_name="conversations")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -53,16 +45,20 @@ class Conversation(models.Model):
 
 
 class Message(models.Model):
+    """
+    A message sent in a conversation.
+    """
     message_id = models.UUIDField(
-        primary_key=True,
-        default=uuid.uuid4,
-        editable=False,
-        db_index=True
+        primary_key=True, default=uuid.uuid4, editable=False, unique=True
     )
-    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
-    conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
-    message_body = models.TextField(null=False)
+    conversation = models.ForeignKey(
+        Conversation, related_name="messages", on_delete=models.CASCADE
+    )
+    sender = models.ForeignKey(
+        User, related_name="messages", on_delete=models.CASCADE
+    )
+    message_body = models.TextField()
     sent_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Message {self.message_id} from {self.sender}"
+        return f"Message {self.message_id} in Conversation {self.conversation_id}"

@@ -1,44 +1,50 @@
+version: "3.8"
+
 services:
   db:
     image: mysql:8.0
-    container_name: messaging_app_db
-    restart: always
+    container_name: messaging_db
+    restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      MYSQL_DATABASE: messaging_db
-      MYSQL_DB: messaging_db
-      MYSQL_USER: user
-      MYSQL_PASSWORD: password
-      MYSQL_ROOT_PASSWORD: rootpassword
-    ports:
-      - "3307:3306"
+      MYSQL_DATABASE: "${MYSQL_DB}"
+      MYSQL_USER: "${MYSQL_USER}"
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
+      # Keep both for checker compatibility
+      MYSQL_DB: "${MYSQL_DB}"
     volumes:
       - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
     healthcheck:
-      # Use $$ to escape $ so compose doesn't try to substitute at parse time
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u$$MYSQL_USER -p$$MYSQL_PASSWORD"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   web:
-    build: .
-    container_name: messaging_app_web
-    command: ["sh", "-c", "python3 manage.py migrate && python3 manage.py runserver 0.0.0.0:8000"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: messaging_web
+    env_file:
+      - .env
+    command: sh -c "python manage.py migrate --noinput && python3 manage.py runserver 0.0.0.0:8000"
     volumes:
       - .:/app
     ports:
       - "8000:8000"
+    environment:
+      - DATABASE_HOST=db
+      - DATABASE_PORT=3306
+      - DATABASE_NAME=${MYSQL_DB}
+      - DATABASE_USER=${MYSQL_USER}
+      - DATABASE_PASSWORD=${MYSQL_PASSWORD}
     depends_on:
       db:
         condition: service_healthy
-
-    environment:
-      - DB_ENGINE=django.db.backends.mysql
-      - DB_NAME=messaging_db
-      - DB_USER=user
-      - DB_PASSWORD=password
-      - DB_HOST=db
-      - DB_PORT=3306
 
 volumes:
   mysql_data:

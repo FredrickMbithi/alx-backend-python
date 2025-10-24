@@ -1,74 +1,70 @@
-# Django Messaging App Kubernetes Deployment
-# This file deploys the Django messaging app to Kubernetes cluster
-
+# deployment.yaml - Base deployment for the Django messaging app (Task 1)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: django-messaging-app
+  name: messaging-app-deployment
   labels:
-    app: django-messaging-app
-    version: v1.0
+    app: messaging-app
+    tier: web
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: django-messaging-app
+      app: messaging-app
+      tier: web
   template:
     metadata:
       labels:
-        app: django-messaging-app
-        version: v1.0
+        app: messaging-app
+        tier: web
     spec:
       containers:
-        - name: django-app
-          image: messaging-app:latest
-          imagePullPolicy: Never # Use local image for Minikube
+        - name: messaging-app
+          image: messaging-app:1.0
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
-              name: http
           env:
-            - name: DEBUG
-              value: "True"
-            - name: ALLOWED_HOSTS
-              value: "*"
-            - name: DB_ENGINE
-              value: "django.db.backends.sqlite3"
-            - name: DJANGO_DEBUG
-              value: "True"
-          resources:
-            requests:
-              memory: "128Mi"
-              cpu: "100m"
-            limits:
-              memory: "256Mi"
-              cpu: "500m"
+            - name: DJANGO_SETTINGS_MODULE
+              value: messaging_app.settings
+            - name: DATABASE_HOST
+              value: mysql-service
+            - name: DATABASE_PORT
+              value: "3306"
+            - name: DATABASE_NAME
+              value: messaging_db
+            - name: DATABASE_USER
+              value: messaging_user
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: messaging-db-secret
+                  key: mysql-password
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /
               port: 8000
             initialDelaySeconds: 30
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /
-              port: 8000
-            initialDelaySeconds: 5
-            periodSeconds: 5
-          command: ["python3", "manage.py"]
-          args: ["runserver", "0.0.0.0:8000"]
+            periodSeconds: 20
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: django-messaging-service
+  name: messaging-app-service
   labels:
-    app: django-messaging-app
+    app: messaging-app
+    tier: web
 spec:
-  type: ClusterIP
-  ports:
-    - port: 80
-      targetPort: 8000
-      protocol: TCP
-      name: http
   selector:
-    app: django-messaging-app
+    app: messaging-app
+    tier: web
+  ports:
+    - port: 8000
+      targetPort: 8000
+  type: ClusterIP

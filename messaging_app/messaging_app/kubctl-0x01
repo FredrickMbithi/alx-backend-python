@@ -1,55 +1,46 @@
 #!/bin/bash
+# kubctl-0x01 - Task 2 helper script
+# Scales the messaging app deployment, verifies pod count, runs wrk, and checks resource usage.
+# Requirements: kubectl, minikube, wrk, and the Kubernetes Metrics Server (for kubectl top).
 
-# kubctl-0x01 - Scale Django app to 3 replicas and perform load testing
-# Task 2: Scale the Django App Using Kubernetes
+set -euo pipefail
 
-echo "📈 Scaling Django app to 3 replicas..."
+info() {
+  printf '[INFO] %s\n' "$1"
+}
 
-# Scale the deployment to 3 replicas
-kubectl scale deployment django-messaging-app --replicas=3
+error_exit() {
+  printf '[ERROR] %s\n' "$1" >&2
+  exit 1
+}
 
-echo "⏳ Waiting for pods to be ready..."
-sleep 10
+DEPLOYMENT_NAME="messaging-app-deployment"
+TARGET_REPLICAS=3
+SERVICE_NAME="messaging-app-service"
 
-echo "📋 Checking running pods..."
-kubectl get pods -l app=django-messaging-app
+info "Scaling ${DEPLOYMENT_NAME} to ${TARGET_REPLICAS} replicas"
+kubectl scale deployment "${DEPLOYMENT_NAME}" --replicas="${TARGET_REPLICAS}"
 
-# Also show all pods (checker-friendly)
-kubectl get pods
+info "Waiting for pods to reach the Running state"
+kubectl wait --for=condition=Available deployment/"${DEPLOYMENT_NAME}" --timeout=120s
 
-echo ""
-echo "📊 Monitoring resource usage..."
-kubectl top pods -l app=django-messaging-app || echo "Note: Metrics server may not be available"
+info "Listing pods"
+kubectl get pods -l app=messaging-app -o wide
 
-echo ""
-echo "🔧 Performing load testing with wrk..."
-
-# Get service endpoint for load testing
-SERVICE_IP=$(kubectl get service django-messaging-service -o jsonpath='{.spec.clusterIP}')
-echo "Service IP: $SERVICE_IP"
-
-# Port forward for load testing (run in background)
-kubectl port-forward service/django-messaging-service 8000:8000 &
-PORT_FORWARD_PID=$!
-
-# Wait for port forward to establish
-sleep 5
-
-echo "🚀 Running load test (10 seconds, 2 threads, 10 connections)..."
-if command -v wrk >/dev/null 2>&1; then
-    wrk -t2 -c10 -d10s http://localhost:8000/
-else
-    echo "wrk not installed. Using curl for basic testing..."
-    for i in {1..10}; do
-        echo "Request $i:"
-        curl -s -o /dev/null -w "%{http_code} - %{time_total}s\n" http://localhost:8000/ || echo "Request failed"
-        sleep 1
-    done
+info "Preparing load test with wrk"
+if ! command -v wrk >/dev/null 2>&1; then
+  error_exit "wrk is not installed. Install it from https://github.com/wg/wrk"
 fi
 
-# Clean up port forward
-kill $PORT_FORWARD_PID 2>/dev/null
+SERVICE_URL=$(minikube service "${SERVICE_NAME}" --url)
+info "Running wrk against ${SERVICE_URL}"
+wrk -t2 -c20 -d15s "${SERVICE_URL}" || info "wrk exited with non-zero status; verify service availability"
 
-echo ""
-echo "✅ Load testing complete! Check pods status:"
-kubectl get pods -l app=django-messaging-app
+info "Displaying resource usage (kubectl top pods)"
+if kubectl top pods >/dev/null 2>&1; then
+  kubectl top pods -l app=messaging-app
+else
+  info "Metrics Server is not installed; skipping kubectl top. Install it via 'minikube addons enable metrics-server'."
+fi
+
+info "Task 2 workflow completed"

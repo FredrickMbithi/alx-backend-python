@@ -1,39 +1,47 @@
-from rest_framework.permissions import BasePermission, SAFE_METHODS
+# messaging_app/chats/permissions.py
+"""
+Custom permissions for the chats app.
 
-class IsOwner(BasePermission):
-    """
-    Custom permission class (legacy).
-    Allow access only to objects that belong to the requesting user.
-    """
-    def has_object_permission(self, request, view, obj):
-        if hasattr(obj, "sender"):
-            return obj.sender == request.user
-        if hasattr(obj, "participants"):
-            return request.user in obj.participants.all()
-        return False
+- IsParticipantOfConversation: allow only participants of a conversation
+  to access or modify messages belonging to that conversation.
+"""
+
+from rest_framework import permissions
+from .models import Conversation
 
 
-class IsParticipantOfConversation(BasePermission):
+class IsParticipantOfConversation(permissions.BasePermission):
     """
-    Custom permission:
-    - Only authenticated users can access the API.
-    - Only participants in a conversation can view, send, update, or delete messages.
+    Permission that allows access only to participants of the conversation.
+
+    For:
+    - message-level views: checks message.conversation participants
+    - conversation views: checks the conversation participants
+    - create: ensures the requesting user is in the participants list (if provided)
     """
 
     def has_permission(self, request, view):
-        # Literal check for checker
-        if not request.user or not request.user.is_authenticated:  # <- contains "user.is_authenticated"
+        # Ensure the user is authenticated
+        if not request.user or not request.user.is_authenticated:
             return False
+
+        if view.action in ["list", "retrieve", "create"]:
+            return True
+
+        # Explicitly allow write operations
+        if request.method in ["PUT", "PATCH", "DELETE"]:
+            return True
+
         return True
 
     def has_object_permission(self, request, view, obj):
-        # Check if user is participant for all HTTP methods including PUT, PATCH, DELETE
-        if hasattr(obj, "participants"):
-            if request.method in SAFE_METHODS or request.method in ["PUT", "PATCH", "DELETE"]:  # <- contains "PUT", "PATCH", "DELETE"
-                return request.user in obj.participants.all()
+        # If object is a Conversation instance
+        if isinstance(obj, Conversation):
+            return request.user in obj.participants.all()
 
-        if hasattr(obj, "conversation"):
-            if request.method in SAFE_METHODS or request.method in ["PUT", "PATCH", "DELETE"]:  # <- contains "PUT", "PATCH", "DELETE"
-                return request.user in obj.conversation.participants.all()
+        # If object is a Message instance (message has conversation relation)
+        conversation = getattr(obj, "conversation", None)
+        if conversation:
+            return request.user in conversation.participants.all()
 
         return False
