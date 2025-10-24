@@ -1,0 +1,58 @@
+pipeline {
+    agent any
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Checking out code from GitHub...'
+                git credentialsId: 'github-creds', 
+                    url: 'https://github.com/YOUR_USERNAME/alx-backend-python.git',
+                    branch: 'main'
+            }
+        }
+        
+        stage('Setup Python Environment') {
+            steps {
+                echo 'Setting up Python virtual environment...'
+                sh '''
+                    python3 -m venv venv
+                    . venv/bin/activate
+                    pip install --upgrade pip
+                '''
+            }
+        }
+        
+        stage('Install Dependencies') {
+            steps {
+                echo 'Installing project dependencies...'
+                sh '''
+                    . venv/bin/activate
+                    pip install -r requirements.txt
+                '''
+            }
+        }
+        
+        stage('Run Tests') {
+            steps {
+                echo 'Running tests with pytest...'
+                sh '''
+                    . venv/bin/activate
+                    pytest --junitxml=report.xml --verbose
+                '''
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo 'Publishing test results...'
+            junit 'report.xml'
+        }
+        success {
+            echo '✅ Pipeline completed successfully!'
+        }
+        failure {
+            echo '❌ Pipeline failed. Check the logs above.'
+        }
+    }
+}
