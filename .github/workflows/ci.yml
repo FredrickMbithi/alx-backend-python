@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       mysql:
-        image: mysql:5.7
+        image: mysql:8.0
         env:
           MYSQL_ROOT_PASSWORD: password
           MYSQL_DATABASE: messaging_db
@@ -20,8 +20,8 @@ jobs:
         ports:
           - 3306:3306
         options: >-
-          --health-cmd "mysqladmin ping --silent"
-          --health-interval=10s --health-timeout=5s --health-retries=3
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ppassword"
+          --health-interval=10s --health-timeout=5s --health-retries=5
 
     env:
       DJANGO_SETTINGS_MODULE: messaging_app.settings
@@ -36,34 +36,83 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.10"
+          cache: "pip"
 
-      - name: Install dependencies
+      - name: Install system dependencies (mysqlclient)
         run: |
-          python -m pip install --upgrade pip
-          if [ -f messaging_app/requirements.txt ]; then python -m pip install -r messaging_app/requirements.txt; fi
-          python -m pip install pytest pytest-django flake8 coverage
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            gcc \
+            python3-dev \
+            pkg-config \
+            default-libmysqlclient-dev
+
+      - name: Install Python dependencies
+        working-directory: ./messaging_app
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+          pip install pytest pytest-django pytest-cov flake8 coverage
 
       - name: Lint with flake8
+        working-directory: ./messaging_app
         run: |
-          flake8 messaging_app
+          flake8 . \
+            --count \
+            --select=E9,F63,F7,F82 \
+            --show-source \
+            --statistics \
+            --exclude=venv,migrations,__pycache__,.git,*.pyc,*.egg-info,htmlcov,.pytest_cache
 
-      - name: Run tests with coverage
+      - name: Wait for MySQL to be ready
         run: |
-          # Wait for MySQL to be ready (if tests use it)
-          for i in {1..30}; do mysqladmin ping -h 127.0.0.1 -P 3306 --silent && break || sleep 1; done
-          coverage run -m pytest messaging_app --junitxml=reports/report.xml || true
+          for i in {1..30}; do
+            if mysqladmin ping -h 127.0.0.1 -uroot -ppassword --silent; then
+              echo "MySQL is ready"; break; fi; sleep 2; done
+
+      - name: Django checks and migrations
+        working-directory: ./messaging_app
+        env:
+          DJANGO_SETTINGS_MODULE: messaging_app.settings
+          DATABASE_HOST: 127.0.0.1
+          DATABASE_PORT: 3306
+          DATABASE_NAME: messaging_db
+          DATABASE_USER: messaging_user
+          DATABASE_PASSWORD: password
+        run: |
+          python manage.py check --database default
+          python manage.py migrate --noinput
+
+      - name: Run tests with coverage (pytest)
+        working-directory: ./messaging_app
+        env:
+          DJANGO_SETTINGS_MODULE: messaging_app.settings
+          DATABASE_HOST: 127.0.0.1
+          DATABASE_PORT: 3306
+          DATABASE_NAME: messaging_db
+          DATABASE_USER: messaging_user
+          DATABASE_PASSWORD: password
+        run: |
+          mkdir -p reports
+          pytest chats/ \
+            --junitxml=reports/report.xml \
+            --cov=chats \
+            --cov-report=xml \
+            --cov-report=term \
+            --verbose
 
       - name: Upload test report
         uses: actions/upload-artifact@v4
         with:
           name: junit-report
-          path: reports/report.xml
+          path: messaging_app/reports/report.xml
 
-      - name: Upload coverage
+      - name: Upload coverage (XML)
         uses: actions/upload-artifact@v4
         with:
           name: coverage
-          path: coverage.xml
+          path: messaging_app/coverage.xml
