@@ -5,6 +5,8 @@ pipeline {
         // Consistent virtual environment directory
         VENV_DIR = 'venv'
         PYTHON = 'python3' // fallback alias for Linux
+        // Ensure pytest-django knows which settings to use
+        DJANGO_SETTINGS_MODULE = 'messaging_app.settings'
     }
 
     stages {
@@ -22,21 +24,23 @@ pipeline {
         stage('Setup Python Environment') {
             steps {
                 echo '🐍 Setting up Python virtual environment...'
-                script {
-                    if (isUnix()) {
-                        sh '''
-                            echo "Setting up Python venv..."
-                            ${PYTHON} -m venv ${VENV_DIR} || python -m venv ${VENV_DIR}
-                            . ${VENV_DIR}/bin/activate
-                            pip install --upgrade pip setuptools wheel
-                        '''
-                    } else {
-                        bat '''
-                            echo Setting up Python venv...
-                            python -m venv %VENV_DIR%
-                            call %VENV_DIR%\\Scripts\\activate
-                            python -m pip install --upgrade pip setuptools wheel
-                        '''
+                dir('messaging_app') {
+                    script {
+                        if (isUnix()) {
+                            sh '''
+                                echo "Setting up Python venv..."
+                                ${PYTHON} -m venv ${VENV_DIR} || python -m venv ${VENV_DIR}
+                                . ${VENV_DIR}/bin/activate
+                                pip install --upgrade pip setuptools wheel
+                            '''
+                        } else {
+                            bat '''
+                                echo Setting up Python venv...
+                                python -m venv %VENV_DIR%
+                                call %VENV_DIR%\\Scripts\\activate
+                                python -m pip install --upgrade pip setuptools wheel
+                            '''
+                        }
                     }
                 }
             }
@@ -45,31 +49,35 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 echo '📦 Installing dependencies...'
-                script {
-                    if (isUnix()) {
-                        sh '''
-                            . ${VENV_DIR}/bin/activate
-                            if [ -f requirements.txt ]; then
-                                echo "Installing from requirements.txt..."
-                                pip install -r requirements.txt
-                            else
-                                echo "⚠️ No requirements.txt found!"
-                            fi
-                            pip install pytest pytest-django django-filter drf-nested-routers --upgrade
-                            pip freeze
-                        '''
-                    } else {
-                        bat '''
-                            call %VENV_DIR%\\Scripts\\activate
-                            if exist requirements.txt (
-                                echo Installing from requirements.txt...
-                                pip install -r requirements.txt
-                            ) else (
-                                echo ⚠️ No requirements.txt found!
-                            )
-                            pip install pytest pytest-django django-filter drf-nested-routers --upgrade
-                            pip freeze
-                        '''
+                dir('messaging_app') {
+                    script {
+                        if (isUnix()) {
+                            sh '''
+                                . ${VENV_DIR}/bin/activate
+                                if [ -f requirements.txt ]; then
+                                    echo "Installing from requirements.txt..."
+                                    pip install -r requirements.txt
+                                else
+                                    echo "⚠️ No requirements.txt found!"
+                                fi
+                                # Ensure test tooling is present even if not in requirements
+                                pip install --upgrade pytest pytest-django parameterized django-filter drf-nested-routers
+                                pip freeze
+                            '''
+                        } else {
+                            bat '''
+                                call %VENV_DIR%\\Scripts\\activate
+                                if exist requirements.txt (
+                                    echo Installing from requirements.txt...
+                                    pip install -r requirements.txt
+                                ) else (
+                                    echo ⚠️ No requirements.txt found!
+                                )
+                                rem Ensure test tooling is present even if not in requirements
+                                pip install --upgrade pytest pytest-django parameterized django-filter drf-nested-routers
+                                pip freeze
+                            '''
+                        }
                     }
                 }
             }
@@ -78,17 +86,19 @@ pipeline {
         stage('Run Migrations') {
             steps {
                 echo '🛠 Running Django migrations...'
-                script {
-                    if (isUnix()) {
-                        sh """
-                            . ${VENV_DIR}/bin/activate
-                            python manage.py migrate --noinput || echo 'No migrations to apply.'
-                        """
-                    } else {
-                        bat """
-                            call %VENV_DIR%\\Scripts\\activate
-                            python manage.py migrate --noinput || echo No migrations to apply.
-                        """
+                dir('messaging_app') {
+                    script {
+                        if (isUnix()) {
+                            sh """
+                                . ${VENV_DIR}/bin/activate
+                                python manage.py migrate --noinput || echo 'No migrations to apply.'
+                            """
+                        } else {
+                            bat """
+                                call %VENV_DIR%\\Scripts\\activate
+                                python manage.py migrate --noinput || echo No migrations to apply.
+                            """
+                        }
                     }
                 }
             }
@@ -97,17 +107,21 @@ pipeline {
         stage('Run Tests') {
             steps {
                 echo '🧪 Running unit tests...'
-                script {
-                    if (isUnix()) {
-                        sh """
-                            . ${VENV_DIR}/bin/activate
-                            pytest --junitxml=report.xml --maxfail=1 --disable-warnings -v
-                        """
-                    } else {
-                        bat """
-                            call %VENV_DIR%\\Scripts\\activate
-                            pytest --junitxml=report.xml --maxfail=1 --disable-warnings -v
-                        """
+                dir('messaging_app') {
+                    script {
+                        if (isUnix()) {
+                            sh """
+                                . ${VENV_DIR}/bin/activate
+                                # Limit test discovery to this Django project to avoid unrelated repo tests
+                                pytest . --junitxml=report.xml --maxfail=1 --disable-warnings -v
+                            """
+                        } else {
+                            bat """
+                                call %VENV_DIR%\\Scripts\\activate
+                                rem Limit test discovery to this Django project to avoid unrelated repo tests
+                                pytest . --junitxml=report.xml --maxfail=1 --disable-warnings -v
+                            """
+                        }
                     }
                 }
             }
@@ -117,7 +131,8 @@ pipeline {
     post {
         always {
             echo '📊 Publishing test results...'
-            junit 'report.xml'
+            // Report is generated inside messaging_app
+            junit 'messaging_app/report.xml'
         }
         success {
             echo '✅ Pipeline completed successfully! Everything is working as expected.'
