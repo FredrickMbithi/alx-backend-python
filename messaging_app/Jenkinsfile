@@ -6,7 +6,7 @@ pipeline {
             steps {
                 echo 'Checking out code from GitHub...'
                 git credentialsId: 'github-creds', 
-                    url: 'https://github.com/YOUR_USERNAME/alx-backend-python.git',
+                    url: 'https://github.com/FredrickMbithi/alx-backend-python.git',
                     branch: 'main'
             }
         }
