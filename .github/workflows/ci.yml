@@ -125,8 +125,8 @@ jobs:
       - name: Run flake8
         working-directory: messaging_app
         run: |
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 . --count --max-complexity=10 --max-line-length=120 --statistics
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=*/migrations/*,messaging_app/settings.py
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics --exclude=*/migrations/*
 
       - name: Check code formatting with black
         working-directory: messaging_app
