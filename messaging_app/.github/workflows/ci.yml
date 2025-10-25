@@ -1,5 +1,3 @@
-# GitHub Actions CI/CD workflow for Django messaging_app
-# Task 2: Set Up a GitHub Actions Workflow for Testing
 name: Django CI
 
 on:
