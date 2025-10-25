@@ -131,6 +131,7 @@ jobs:
 
       - name: Run tests with pytest
         working-directory: ./messaging_app
+        continue-on-error: false
         run: |
           pytest \
             --verbose \
@@ -143,6 +144,13 @@ jobs:
             --cov-report=term \
             --ds=messaging_app.settings \
             chats/
+
+      - name: Display test results
+        if: always()
+        working-directory: ./messaging_app
+        run: |
+          echo "=== Test Results XML Content ==="
+          cat test-results.xml || echo "No test results file found"
 
       - name: Upload test results
         if: always()
