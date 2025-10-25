@@ -64,6 +64,31 @@ jobs:
           done
           mysql -h 127.0.0.1 -P 3306 -u root -proot_password -e "SHOW DATABASES;"
 
+      - name: Grant database privileges for testing
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -u root -proot_password <<SQL
+          -- Grant all privileges for both '%' and specific Docker network hosts
+          GRANT ALL PRIVILEGES ON test_messaging_db.* TO 'messaging_user'@'%';
+          GRANT ALL PRIVILEGES ON test_messaging_db.* TO 'messaging_user'@'172.18.0.1';
+          GRANT ALL PRIVILEGES ON test_messaging_db.* TO 'messaging_user'@'localhost';
+
+          -- Grant privileges for test database that Django creates
+          GRANT ALL PRIVILEGES ON test_test_messaging_db.* TO 'messaging_user'@'%';
+          GRANT ALL PRIVILEGES ON test_test_messaging_db.* TO 'messaging_user'@'172.18.0.1';
+          GRANT ALL PRIVILEGES ON test_test_messaging_db.* TO 'messaging_user'@'localhost';
+
+          -- Grant global privileges needed for Django test runner (CREATE/DROP databases)
+          GRANT CREATE, DROP, ALTER, INDEX, REFERENCES, SELECT, INSERT, UPDATE, DELETE ON *.* TO 'messaging_user'@'%';
+          GRANT CREATE, DROP, ALTER, INDEX, REFERENCES, SELECT, INSERT, UPDATE, DELETE ON *.* TO 'messaging_user'@'172.18.0.1';
+          GRANT CREATE, DROP, ALTER, INDEX, REFERENCES, SELECT, INSERT, UPDATE, DELETE ON *.* TO 'messaging_user'@'localhost';
+
+          FLUSH PRIVILEGES;
+
+          -- Show granted privileges
+          SHOW GRANTS FOR 'messaging_user'@'%';
+          SHOW GRANTS FOR 'messaging_user'@'172.18.0.1';
+          SQL
+
       - name: Install system dependencies
         run: |
           sudo apt-get update -qq
@@ -119,25 +144,45 @@ jobs:
 
       - name: Run tests with pytest
         working-directory: ./messaging_app
+        continue-on-error: false
         run: |
+          echo "=== Pytest Collection Phase ==="
+          pytest --collect-only chats/
+
+          echo "=== Running Tests ==="
           pytest \
             --verbose \
-            --tb=short \
-            --maxfail=1 \
+            --tb=long \
             --disable-warnings \
-            -q \
-            --junitxml=../test-results.xml \
-            --cov=. \
-            --cov-report=xml:../coverage.xml \
-            --cov-report=html:../htmlcov \
-            --cov-report=term
+            --junitxml=test-results.xml \
+            --cov=chats \
+            --cov-report=xml:coverage.xml \
+            --cov-report=html:htmlcov \
+            --cov-report=term \
+            --ds=messaging_app.settings \
+            chats/ ; TEST_EXIT=$?
+
+          echo "Test exit code: $TEST_EXIT"
+          exit $TEST_EXIT
+
+      - name: Display test results
+        if: always()
+        working-directory: ./messaging_app
+        run: |
+          echo "=== Test Results XML Content ==="
+          if [ -f test-results.xml ]; then
+            cat test-results.xml
+          else
+            echo "No test results file found"
+            ls -la
+          fi
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results-python-${{ matrix.python-version }}
-          path: test-results.xml
+          path: messaging_app/test-results.xml
           retention-days: 30
 
       - name: Upload coverage reports
@@ -146,8 +191,8 @@ jobs:
         with:
           name: coverage-python-${{ matrix.python-version }}
           path: |
-            coverage.xml
-            htmlcov/
+            messaging_app/coverage.xml
+            messaging_app/htmlcov/
           retention-days: 30
 
       - name: Comment coverage on PR
