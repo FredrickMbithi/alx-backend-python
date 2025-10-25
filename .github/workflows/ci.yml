@@ -67,17 +67,26 @@ jobs:
       - name: Grant database privileges for testing
         run: |
           mysql -h 127.0.0.1 -P 3306 -u root -proot_password <<SQL
-          -- Grant all privileges on the test database and any test databases Django creates
+          -- Grant all privileges for both '%' and specific Docker network hosts
           GRANT ALL PRIVILEGES ON test_messaging_db.* TO 'messaging_user'@'%';
+          GRANT ALL PRIVILEGES ON test_messaging_db.* TO 'messaging_user'@'172.18.0.1';
+          GRANT ALL PRIVILEGES ON test_messaging_db.* TO 'messaging_user'@'localhost';
+
+          -- Grant privileges for test database that Django creates
           GRANT ALL PRIVILEGES ON test_test_messaging_db.* TO 'messaging_user'@'%';
-          
-          -- Grant global privileges needed for Django test runner
+          GRANT ALL PRIVILEGES ON test_test_messaging_db.* TO 'messaging_user'@'172.18.0.1';
+          GRANT ALL PRIVILEGES ON test_test_messaging_db.* TO 'messaging_user'@'localhost';
+
+          -- Grant global privileges needed for Django test runner (CREATE/DROP databases)
           GRANT CREATE, DROP, ALTER, INDEX, REFERENCES, SELECT, INSERT, UPDATE, DELETE ON *.* TO 'messaging_user'@'%';
-          
+          GRANT CREATE, DROP, ALTER, INDEX, REFERENCES, SELECT, INSERT, UPDATE, DELETE ON *.* TO 'messaging_user'@'172.18.0.1';
+          GRANT CREATE, DROP, ALTER, INDEX, REFERENCES, SELECT, INSERT, UPDATE, DELETE ON *.* TO 'messaging_user'@'localhost';
+
           FLUSH PRIVILEGES;
-          
+
           -- Show granted privileges
           SHOW GRANTS FOR 'messaging_user'@'%';
+          SHOW GRANTS FOR 'messaging_user'@'172.18.0.1';
           SQL
 
       - name: Install system dependencies
