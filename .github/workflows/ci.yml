@@ -164,9 +164,9 @@ jobs:
           echo "## Test Results for Python ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           if [ -f test-results.xml ]; then
-            echo "✅ Tests completed" >> $GITHUB_STEP_SUMMARY
+            echo "Tests completed" >> $GITHUB_STEP_SUMMARY
           else
-            echo "❌ Tests failed or did not run" >> $GITHUB_STEP_SUMMARY
+            echo "Tests failed or did not run" >> $GITHUB_STEP_SUMMARY
           fi
 
   lint:
