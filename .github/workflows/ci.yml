@@ -2,9 +2,9 @@ name: Django CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   test:
@@ -62,6 +62,13 @@ jobs:
             sleep 5
           done
           echo "MySQL not ready in time" && exit 1
+
+      - name: Grant test database privileges
+        run: |
+          mysql -h 127.0.0.1 -uroot -prootpassword123 <<SQL
+          GRANT ALL PRIVILEGES ON *.* TO 'messaging_user'@'%';
+          FLUSH PRIVILEGES;
+          SQL
 
       - name: Run migrations
         working-directory: messaging_app
