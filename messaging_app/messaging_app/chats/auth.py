@@ -16,16 +16,16 @@ User = get_user_model()
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     password_confirm = serializers.CharField(write_only=True)
-    
+
     class Meta:
         model = User
         fields = ('username', 'email', 'password', 'password_confirm', 'first_name', 'last_name')
-    
+
     def validate(self, attrs):
         if attrs['password'] != attrs['password_confirm']:
             raise serializers.ValidationError("Passwords don't match")
         return attrs
-    
+
     def create(self, validated_data):
         validated_data.pop('password_confirm')
         password = validated_data.pop('password')
@@ -36,7 +36,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 class UserRegistrationView(APIView):
     permission_classes = [AllowAny]
-    
+
     def post(self, request):
         serializer = UserRegistrationSerializer(data=request.data)
         if serializer.is_valid():
@@ -69,12 +69,12 @@ def login_view(request):
     """
     username = request.data.get('username')
     password = request.data.get('password')
-    
+
     if not username or not password:
         return Response({
             'error': 'Username and password are required'
         }, status=status.HTTP_400_BAD_REQUEST)
-    
+
     user = authenticate(username=username, password=password)
     if user:
         refresh = RefreshToken.for_user(user)

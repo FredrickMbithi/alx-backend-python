@@ -23,12 +23,12 @@ class MessageSerializer(serializers.ModelSerializer):
     """
     sender = UserSerializer(read_only=True)
     sender_id = serializers.IntegerField(write_only=True, required=False)
-    
+
     class Meta:
         model = Message
         fields = ['id', 'conversation', 'sender', 'sender_id', 'message_body', 'timestamp']
         read_only_fields = ['id', 'timestamp']
-    
+
     def create(self, validated_data):
         # Set sender to current user if not provided
         if 'sender_id' not in validated_data:
@@ -49,24 +49,24 @@ class ConversationSerializer(serializers.ModelSerializer):
     )
     last_message = MessageSerializer(read_only=True)
     message_count = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Conversation
-        fields = ['id', 'participants', 'participant_ids', 'created_at', 'updated_at', 
+        fields = ['id', 'participants', 'participant_ids', 'created_at', 'updated_at',
                  'last_message', 'message_count']
         read_only_fields = ['id', 'created_at', 'updated_at']
-    
+
     def get_message_count(self, obj):
         """Get the total number of messages in this conversation"""
         return obj.messages.count()
-    
+
     def create(self, validated_data):
         participant_ids = validated_data.pop('participant_ids', [])
         conversation = super().create(validated_data)
-        
+
         # Add the current user as a participant
         conversation.participants.add(self.context['request'].user)
-        
+
         # Add other participants
         if participant_ids:
             # Try filtering by 'id' first, fall back to 'user_id' for custom PKs
@@ -75,7 +75,7 @@ class ConversationSerializer(serializers.ModelSerializer):
             except Exception:
                 users = User.objects.filter(user_id__in=participant_ids)
             conversation.participants.add(*users)
-        
+
         return conversation
 
 class ConversationDetailSerializer(ConversationSerializer):
@@ -84,10 +84,10 @@ class ConversationDetailSerializer(ConversationSerializer):
     """
     messages = MessageSerializer(many=True, read_only=True)
     recent_messages = serializers.SerializerMethodField()
-    
+
     class Meta(ConversationSerializer.Meta):
         fields = ConversationSerializer.Meta.fields + ['messages', 'recent_messages']
-    
+
     def get_recent_messages(self, obj):
         """Get the last 10 messages from this conversation"""
         recent_messages = obj.messages.all()[:10]
