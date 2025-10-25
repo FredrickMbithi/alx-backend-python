@@ -137,10 +137,12 @@ jobs:
             --tb=short \
             --disable-warnings \
             --junitxml=test-results.xml \
-            --cov=. \
+            --cov=chats \
             --cov-report=xml:coverage.xml \
             --cov-report=html:htmlcov \
-            --cov-report=term
+            --cov-report=term \
+            --ds=messaging_app.settings \
+            chats/
 
       - name: Upload test results
         if: always()
