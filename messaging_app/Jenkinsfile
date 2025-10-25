@@ -1,0 +1,368 @@
+pipeline {pipeline {
+
+    agent any    agent any
+
+    
+
+    environment {    environment {
+
+        // GitHub repository details        VENV_DIR = 'venv'
+
+        REPO_URL = 'https://github.com/FredrickMbithi/alx-backend-python.git'        PYTHON = 'python3'
+
+        BRANCH = 'main'        DJANGO_SETTINGS_MODULE = 'messaging_app.settings'
+
+                DATABASE_HOST = '127.0.0.1'
+
+        // Python settings        DATABASE_PORT = '3306'
+
+        PYTHON_VERSION = '3.10'        DATABASE_NAME = 'messaging_db'
+
+                DATABASE_USER = 'messaging_user'
+
+        // MySQL settings for tests        DATABASE_PASSWORD = 'password'
+
+        DATABASE_HOST = '127.0.0.1'    }
+
+        DATABASE_PORT = '3306'    
+
+        DATABASE_NAME = 'test_messaging_db'    stages {
+
+        DATABASE_USER = 'root'        stage('Checkout') {
+
+        DATABASE_PASSWORD = 'root'            steps {
+
+    }                echo 'Checking out code from GitHub...'
+
+                checkout scm
+
+    stages {            }
+
+        stage('Checkout') {        }
+
+            steps {        
+
+                echo '📦 Checking out code from GitHub...'        stage('Install System Dependencies') {
+
+                // Checkout code from GitHub using credentials            steps {
+
+                git branch: "${BRANCH}",                echo 'Installing system packages for mysqlclient...'
+
+                    credentialsId: 'github-credentials',                sh '''
+
+                    url: "${REPO_URL}"                    if command -v apt-get >/dev/null 2>&1; then
+
+                                        export DEBIAN_FRONTEND=noninteractive
+
+                echo '✅ Code checked out successfully'                        if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+
+            }                            sudo apt-get update -qq
+
+        }                            sudo apt-get install -y --no-install-recommends \
+
+                                build-essential gcc python3-dev pkg-config default-libmysqlclient-dev
+
+        stage('Setup Python Environment') {                        else
+
+            steps {                            apt-get update -qq
+
+                echo '🐍 Setting up Python environment...'                            apt-get install -y --no-install-recommends \
+
+                dir('messaging_app') {                                build-essential gcc python3-dev pkg-config default-libmysqlclient-dev
+
+                    sh '''                        fi
+
+                        echo "Python version:"                        echo "System dependencies installed"
+
+                        python3 --version                    elif command -v apk >/dev/null 2>&1; then
+
+                                                apk add --no-cache build-base python3-dev pkgconfig mariadb-connector-c-dev
+
+                        echo "Installing dependencies..."                        echo "System dependencies installed"
+
+                        python3 -m pip install --upgrade pip                    else
+
+                                                echo "Unknown package manager - skipping system deps"
+
+                        if [ -f requirements.txt ]; then                    fi
+
+                            pip3 install -r requirements.txt                '''
+
+                        else            }
+
+                            echo "⚠️  requirements.txt not found"        }
+
+                            exit 1        
+
+                        fi        stage('Setup Python Environment') {
+
+                                    steps {
+
+                        echo "Installing test dependencies..."                echo 'Creating Python virtual environment...'
+
+                        pip3 install pytest pytest-django pytest-cov pytest-html                dir('messaging_app') {
+
+                                            sh '''
+
+                        echo "Installed packages:"                        ${PYTHON} -m venv ${VENV_DIR}
+
+                        pip3 list                        . ${VENV_DIR}/bin/activate
+
+                    '''                        pip install --upgrade pip setuptools wheel
+
+                }                    '''
+
+                echo '✅ Python environment ready'                }
+
+            }            }
+
+        }        }
+
+        
+
+        stage('Run Tests') {        stage('Install Python Dependencies') {
+
+            steps {            steps {
+
+                echo '🧪 Running tests with pytest...'                echo 'Installing Python packages...'
+
+                dir('messaging_app') {                dir('messaging_app') {
+
+                    sh '''                    sh '''
+
+                        # Create reports directory                        . ${VENV_DIR}/bin/activate
+
+                        mkdir -p reports                        
+
+                                                if [ -f requirements.txt ]; then
+
+                        # Run pytest with coverage and HTML report                            echo "Installing from requirements.txt..."
+
+                        python3 -m pytest \                            pip install -r requirements.txt
+
+                            --verbose \                        else
+
+                            --tb=short \                            echo "No requirements.txt found, installing basic deps"
+
+                            --junitxml=reports/junit.xml \                            pip install Django pytest pytest-django
+
+                            --html=reports/report.html \                        fi
+
+                            --self-contained-html \                        
+
+                            --cov=. \                        echo "Installing test dependencies..."
+
+                            --cov-report=xml:reports/coverage.xml \                        pip install --upgrade pytest pytest-django parameterized
+
+                            --cov-report=html:reports/htmlcov \                        
+
+                            --cov-report=term-missing \                        echo "Installed packages:"
+
+                            || true                        pip freeze
+
+                                            '''
+
+                        echo "Test execution completed"                }
+
+                    '''            }
+
+                }        }
+
+                echo '✅ Tests completed'        
+
+            }        stage('Start MySQL Container') {
+
+        }            steps {
+
+                echo 'Starting MySQL database...'
+
+        stage('Generate Test Report') {                sh '''
+
+            steps {                    if command -v docker >/dev/null 2>&1; then
+
+                echo '📊 Generating test reports...'                        echo "Cleaning up any existing MySQL container..."
+
+                dir('messaging_app') {                        docker rm -f ci-mysql 2>/dev/null || true
+
+                    sh '''                        
+
+                        if [ -f reports/junit.xml ]; then                        echo "Starting MySQL 8.0 container..."
+
+                            echo "✅ JUnit XML report generated"                        docker run -d \
+
+                            ls -lh reports/junit.xml                            --name ci-mysql \
+
+                        else                            -p 3306:3306 \
+
+                            echo "⚠️  JUnit XML report not found"                            -e MYSQL_DATABASE=${DATABASE_NAME} \
+
+                        fi                            -e MYSQL_USER=${DATABASE_USER} \
+
+                                                    -e MYSQL_PASSWORD=${DATABASE_PASSWORD} \
+
+                        if [ -f reports/report.html ]; then                            -e MYSQL_ROOT_PASSWORD=${DATABASE_PASSWORD} \
+
+                            echo "✅ HTML report generated"                            --health-cmd="mysqladmin ping -h 127.0.0.1 -u${DATABASE_USER} -p${DATABASE_PASSWORD}" \
+
+                            ls -lh reports/report.html                            --health-interval=5s \
+
+                        else                            --health-timeout=3s \
+
+                            echo "⚠️  HTML report not found"                            --health-retries=30 \
+
+                        fi                            mysql:8.0
+
+                                                
+
+                        if [ -f reports/coverage.xml ]; then                        echo "Waiting for MySQL to be healthy..."
+
+                            echo "✅ Coverage report generated"                        for i in $(seq 1 60); do
+
+                            ls -lh reports/coverage.xml                            status=$(docker inspect --format='{{.State.Health.Status}}' ci-mysql 2>/dev/null || echo "starting")
+
+                        else                            echo "Attempt $i/60: MySQL status = $status"
+
+                            echo "⚠️  Coverage report not found"                            
+
+                        fi                            if [ "$status" = "healthy" ]; then
+
+                    '''                                echo "MySQL is ready and healthy!"
+
+                }                                sleep 3
+
+            }                                exit 0
+
+        }                            fi
+
+    }                            sleep 3
+
+                        done
+
+    post {                        
+
+        always {                        echo "MySQL failed to become healthy within timeout"
+
+            echo '📋 Pipeline execution completed'                        docker logs ci-mysql
+
+                                    exit 1
+
+            // Archive test reports                    else
+
+            dir('messaging_app') {                        echo "Docker not available - skipping MySQL container setup"
+
+                // Publish JUnit test results                    fi
+
+                junit allowEmptyResults: true, testResults: 'reports/junit.xml'                '''
+
+                            }
+
+                // Archive HTML reports        }
+
+                archiveArtifacts artifacts: 'reports/**/*', allowEmptyArchive: true, fingerprint: true        
+
+                        stage('Run Migrations') {
+
+                // Publish HTML report            steps {
+
+                publishHTML(target: [                echo 'Running Django migrations...'
+
+                    allowMissing: true,                dir('messaging_app') {
+
+                    alwaysLinkToLastBuild: true,                    sh '''
+
+                    keepAll: true,                        . ${VENV_DIR}/bin/activate
+
+                    reportDir: 'reports',                        
+
+                    reportFiles: 'report.html',                        echo "Checking database connectivity..."
+
+                    reportName: 'Pytest HTML Report'                        python manage.py check --database default || echo "Database check warning (may be expected)"
+
+                ])                        
+
+                                        echo "Running migrations..."
+
+                // Publish coverage report                        python manage.py migrate --noinput
+
+                publishHTML(target: [                        
+
+                    allowMissing: true,                        echo "Migrations completed"
+
+                    alwaysLinkToLastBuild: true,                    '''
+
+                    keepAll: true,                }
+
+                    reportDir: 'reports/htmlcov',            }
+
+                    reportFiles: 'index.html',        }
+
+                    reportName: 'Coverage Report'        
+
+                ])        stage('Run Tests') {
+
+            }            steps {
+
+        }                echo 'Running pytest test suite...'
+
+                        dir('messaging_app') {
+
+        success {                    sh '''
+
+            echo '✅ Pipeline completed successfully!'                        . ${VENV_DIR}/bin/activate
+
+        }                        
+
+                                echo "Running tests with pytest..."
+
+        failure {                        pytest --maxfail=1 --disable-warnings -q --junitxml=report.xml
+
+            echo '❌ Pipeline failed. Check the logs for details.'                        
+
+        }                        echo "Copying report to workspace root for archival..."
+
+                                cp report.xml ../report.xml 2>/dev/null || true
+
+        unstable {                        
+
+            echo '⚠️  Pipeline completed with warnings.'                        echo "All tests completed!"
+
+        }                    '''
+
+    }                }
+
+}            }
+
+        }
+    }
+    
+    post {
+        always {
+            echo 'Publishing test results...'
+            junit allowEmptyResults: true, testResults: 'report.xml'
+            
+            script {
+                sh '''
+                    if command -v docker >/dev/null 2>&1; then
+                        echo "Cleaning up MySQL container..."
+                        docker rm -f ci-mysql 2>/dev/null || true
+                        echo "Cleanup complete"
+                    fi
+                '''
+            }
+        }
+        success {
+            echo '✅ Pipeline completed successfully! All stages passed.'
+        }
+        failure {
+            echo '❌ Pipeline failed - review the logs above to identify the issue'
+        }
+        cleanup {
+            echo 'Cleaning up workspace artifacts...'
+            cleanWs deleteDirs: true, patterns: [
+                [pattern: 'messaging_app/venv/**', type: 'INCLUDE'],
+                [pattern: 'messaging_app/**/__pycache__/**', type: 'INCLUDE'],
+                [pattern: 'messaging_app/.pytest_cache/**', type: 'INCLUDE']
+            ]
+        }
+    }
+}
