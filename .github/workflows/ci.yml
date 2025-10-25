@@ -2,7 +2,15 @@ name: Django CI
 
 on:
   push:
+    branches: [main, develop]
+    paths:
+      - "messaging_app/**"
+      - ".github/workflows/ci.yml"
   pull_request:
+    branches: [main, develop]
+    paths:
+      - "messaging_app/**"
+      - ".github/workflows/ci.yml"
 
 jobs:
   test:
@@ -10,39 +18,224 @@ jobs:
 
     services:
       mysql:
-        image: mysql:8
+        image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: messaging_app
+          MYSQL_ROOT_PASSWORD: root_password
+          MYSQL_DATABASE: test_messaging_db
+          MYSQL_USER: messaging_user
+          MYSQL_PASSWORD: password
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping --silent"
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -proot_password"
           --health-interval=10s
           --health-timeout=5s
-          --health-retries=3
+          --health-retries=10
+
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+          cache-dependency-path: "messaging_app/requirements.txt"
+
+      - name: Wait for MySQL to be ready
+        run: |
+          echo "Waiting for MySQL to be ready..."
+          for i in {1..30}; do
+            if mysqladmin ping -h"127.0.0.1" -P"3306" -u"root" -p"root_password" --silent; then
+              echo "MySQL is ready!"
+              break
+            fi
+            echo "Waiting for MySQL... attempt $i/30"
+            sleep 2
+          done
+          mysql -h 127.0.0.1 -P 3306 -u root -proot_password -e "SHOW DATABASES;"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            gcc \
+            python3-dev \
+            pkg-config \
+            default-libmysqlclient-dev \
+            libssl-dev
+
+      - name: Install Python dependencies
+        working-directory: ./messaging_app
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+
+          if [ -f requirements.txt ]; then
+            echo "Installing from requirements.txt..."
+            pip install -r requirements.txt
+          else
+            echo "No requirements.txt found, installing basic dependencies..."
+            pip install Django djangorestframework mysqlclient
+          fi
+
+          # Install test dependencies
+          pip install pytest pytest-django pytest-cov parameterized
+
+          echo "Installed packages:"
+          pip freeze
+
+      - name: Set up environment variables
+        run: |
+          echo "DATABASE_ENGINE=django.db.backends.mysql" >> $GITHUB_ENV
+          echo "DATABASE_NAME=test_messaging_db" >> $GITHUB_ENV
+          echo "DATABASE_USER=messaging_user" >> $GITHUB_ENV
+          echo "DATABASE_PASSWORD=password" >> $GITHUB_ENV
+          echo "DATABASE_HOST=127.0.0.1" >> $GITHUB_ENV
+          echo "DATABASE_PORT=3306" >> $GITHUB_ENV
+          echo "DJANGO_SETTINGS_MODULE=messaging_app.settings" >> $GITHUB_ENV
+          echo "SECRET_KEY=test-secret-key-for-ci-only" >> $GITHUB_ENV
+          echo "DEBUG=True" >> $GITHUB_ENV
+
+      - name: Check Django configuration
+        working-directory: ./messaging_app
+        run: |
+          python manage.py check --database default
+
+      - name: Run migrations
+        working-directory: ./messaging_app
+        run: |
+          python manage.py migrate --noinput
+          python manage.py showmigrations
+
+      - name: Run tests with pytest
+        working-directory: ./messaging_app
+        run: |
+          pytest \
+            --verbose \
+            --tb=short \
+            --maxfail=1 \
+            --disable-warnings \
+            -q \
+            --junitxml=../test-results.xml \
+            --cov=. \
+            --cov-report=xml:../coverage.xml \
+            --cov-report=html:../htmlcov \
+            --cov-report=term
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-python-${{ matrix.python-version }}
+          path: test-results.xml
+          retention-days: 30
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-python-${{ matrix.python-version }}
+          path: |
+            coverage.xml
+            htmlcov/
+          retention-days: 30
+
+      - name: Comment coverage on PR
+        if: github.event_name == 'pull_request'
+        uses: py-cov-action/python-coverage-comment-action@v3
+        with:
+          GITHUB_TOKEN: ${{ github.token }}
+          MINIMUM_GREEN: 80
+          MINIMUM_ORANGE: 60
+
+      - name: Test Summary
+        if: always()
+        run: |
+          echo "## Test Results for Python ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f test-results.xml ]; then
+            echo "✅ Tests completed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Tests failed or did not run" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
-        working-directory: ./messaging_app
+      - name: Install linting tools
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install flake8 black isort pylint
 
-      - name: Run Django tests
+      - name: Run flake8
         working-directory: ./messaging_app
-        env:
-          DB_NAME: messaging_app
-          DB_USER: root
-          DB_PASSWORD: root
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
         run: |
-          python manage.py test
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Check code formatting with black
+        working-directory: ./messaging_app
+        run: |
+          black --check --diff .
+        continue-on-error: true
+
+      - name: Check import sorting with isort
+        working-directory: ./messaging_app
+        run: |
+          isort --check-only --diff .
+        continue-on-error: true
+
+  security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install safety
+        run: |
+          python -m pip install --upgrade pip
+          pip install safety bandit
+
+      - name: Check dependencies for vulnerabilities
+        working-directory: ./messaging_app
+        run: |
+          if [ -f requirements.txt ]; then
+            safety check --file=requirements.txt --output=text
+          fi
+        continue-on-error: true
+
+      - name: Run bandit security scan
+        working-directory: ./messaging_app
+        run: |
+          bandit -r . -f json -o ../bandit-report.json || true
+          bandit -r . -f screen
+        continue-on-error: true
+
+      - name: Upload security report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: bandit-report.json
+          retention-days: 30
