@@ -28,7 +28,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
         working-directory: ./messaging_app
@@ -46,4 +46,3 @@ jobs:
           DB_PORT: 3306
         run: |
           python manage.py test
-
