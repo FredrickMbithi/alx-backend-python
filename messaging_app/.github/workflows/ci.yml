@@ -2,7 +2,9 @@ name: Django CI
 
 on:
   push:
+    branches: [ main, master ]
   pull_request:
+    branches: [ main, master ]
 
 jobs:
   test:
@@ -10,31 +12,55 @@ jobs:
 
     services:
       mysql:
-        image: mysql:5.7
+        image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: password
-          MYSQL_DATABASE: messaging_db
-          MYSQL_USER: messaging_user
-          MYSQL_PASSWORD: password
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: test_db
+          MYSQL_USER: django
+          MYSQL_PASSWORD: django
         ports:
           - 3306:3306
-        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+    env:
+      DJANGO_SETTINGS_MODULE: messaging_app.settings
+      DATABASE_NAME: test_db
+      DATABASE_USER: django
+      DATABASE_PASSWORD: django
+      DATABASE_HOST: 127.0.0.1
+      DATABASE_PORT: 3306
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.9
+          python-version: '3.10'
 
       - name: Install dependencies
         run: |
-          cd messaging_app
-          pip install -r requirements.txt
-          pip install pytest pytest-django
+          python -m pip install --upgrade pip
+          pip install -r messaging_app/requirements.txt
+
+      - name: Wait for MySQL to be ready
+        run: |
+          until mysqladmin ping -h 127.0.0.1 --silent; do
+            echo "Waiting for MySQL..."
+            sleep 3
+          done
+
+      - name: Run database migrations
+        working-directory: ./messaging_app
+        run: |
+          python manage.py migrate
 
       - name: Run tests
+        working-directory: ./messaging_app
         run: |
-          cd messaging_app
           python manage.py test
