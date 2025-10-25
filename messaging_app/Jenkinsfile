@@ -16,7 +16,15 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                checkout scm
+                // Full Git checkout to ensure .git directory exists
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/FredrickMbithi/alx-backend-python.git',
+                        credentialsId: 'github-creds'
+                    ]]
+                ])
             }
         }
 
