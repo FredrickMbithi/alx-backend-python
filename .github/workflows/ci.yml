@@ -135,13 +135,11 @@ jobs:
           pytest \
             --verbose \
             --tb=short \
-            --maxfail=1 \
             --disable-warnings \
-            -q \
-            --junitxml=../test-results.xml \
+            --junitxml=test-results.xml \
             --cov=. \
-            --cov-report=xml:../coverage.xml \
-            --cov-report=html:../htmlcov \
+            --cov-report=xml:coverage.xml \
+            --cov-report=html:htmlcov \
             --cov-report=term
 
       - name: Upload test results
@@ -149,7 +147,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-results-python-${{ matrix.python-version }}
-          path: test-results.xml
+          path: messaging_app/test-results.xml
           retention-days: 30
 
       - name: Upload coverage reports
@@ -158,8 +156,8 @@ jobs:
         with:
           name: coverage-python-${{ matrix.python-version }}
           path: |
-            coverage.xml
-            htmlcov/
+            messaging_app/coverage.xml
+            messaging_app/htmlcov/
           retention-days: 30
 
       - name: Comment coverage on PR
