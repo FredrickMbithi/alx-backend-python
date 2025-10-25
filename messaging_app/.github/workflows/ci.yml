@@ -1,4 +1,4 @@
-name: CI - Tests, Lint, Coverage
+name: CI Pipeline for Django Tests
 
 on:
   push:
