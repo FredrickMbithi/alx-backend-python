@@ -1,3 +1,4 @@
+# ALX Task 2: GitHub Actions CI/CD Workflow for Django messaging_app
 name: Django CI
 
 on:
