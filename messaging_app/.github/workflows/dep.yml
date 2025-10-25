@@ -52,4 +52,4 @@ jobs:
           cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/messaging_app:buildcache,mode=max
 
       - name: Image digest
-        run: echo ${{ steps.meta.outputs.tags }}
+        run: echo "${{ steps.meta.outputs.tags }}"
