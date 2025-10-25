@@ -64,6 +64,18 @@ jobs:
           done
           mysql -h 127.0.0.1 -P 3306 -u root -proot_password -e "SHOW DATABASES;"
 
+      - name: Grant database privileges for testing
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -u root -proot_password <<SQL
+          -- Grant all privileges on the test database
+          GRANT ALL PRIVILEGES ON test_messaging_db.* TO 'messaging_user'@'%';
+          -- Grant permission to create and drop test databases (Django test runner needs this)
+          GRANT CREATE, DROP, ALTER, INDEX, REFERENCES ON *.* TO 'messaging_user'@'%';
+          FLUSH PRIVILEGES;
+          -- Show granted privileges
+          SHOW GRANTS FOR 'messaging_user'@'%';
+          SQL
+
       - name: Install system dependencies
         run: |
           sudo apt-get update -qq
