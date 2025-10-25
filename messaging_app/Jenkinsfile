@@ -6,7 +6,7 @@ pipeline {
     }
 
     environment {
-        IMAGE_NAME          = "garisonmike/messaging_app:latest"
+        IMAGE_NAME          = "freddymbithi/messaging_app:latest"
         MYSQL_ROOT_PASSWORD = "rootpassword123"
         MYSQL_PASSWORD      = "changeme123"
         MYSQL_USER          = "messaging_user"
