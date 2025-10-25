@@ -46,7 +46,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r messaging_app/requirements.txt
 
       - name: Wait for MySQL to be ready
         run: |
@@ -56,9 +56,11 @@ jobs:
           done
 
       - name: Run database migrations
+        working-directory: ./messaging_app
         run: |
           python manage.py migrate
 
       - name: Run tests
+        working-directory: ./messaging_app
         run: |
           python manage.py test
