@@ -1,0 +1,57 @@
+# blue_deployment.yaml - Blue environment deployment (Tasks 4 & 5)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: messaging-app-blue
+  labels:
+    app: messaging-app
+    tier: web
+    color: blue
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: messaging-app
+      tier: web
+      color: blue
+  template:
+    metadata:
+      labels:
+        app: messaging-app
+        tier: web
+        color: blue
+    spec:
+      containers:
+        - name: messaging-app
+          image: messaging-app:2.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DJANGO_SETTINGS_MODULE
+              value: messaging_app.settings
+            - name: DATABASE_HOST
+              value: mysql-service
+            - name: DATABASE_PORT
+              value: "3306"
+            - name: DATABASE_NAME
+              value: messaging_db
+            - name: DATABASE_USER
+              value: messaging_user
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: messaging-db-secret
+                  key: mysql-password
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 20

@@ -1,0 +1,142 @@
+pipeline {
+    agent any
+
+    triggers {
+        pollSCM('* * * * *')
+    }
+
+    environment {
+        IMAGE_NAME          = "freddymbithi/messaging_app:latest"
+        MYSQL_ROOT_PASSWORD = "rootpassword123"
+        MYSQL_PASSWORD      = "changeme123"
+        MYSQL_USER          = "messaging_user"
+        MYSQL_DB            = "messaging_db"
+        VENV_DIR            = "venv"
+    }
+
+    stages {
+        stage('Setup Python Environment') {
+            steps {
+                sh '''
+                    echo "Setting up Python virtual environment..."
+                    python3 -m venv ${VENV_DIR}
+                    . ${VENV_DIR}/bin/activate
+                    pip install --upgrade pip
+                    pip install -r messaging_app/requirements.txt
+                '''
+            }
+        }
+
+        stage('Reset Environment') {
+            steps {
+                dir('messaging_app') {
+                    sh 'docker compose down -v || true'
+                }
+            }
+        }
+
+        stage('Verify Docker CLI') {
+            steps {
+                sh 'docker --version'
+                sh 'docker compose version'
+            }
+        }
+
+        stage('Prepare .env') {
+            steps {
+                dir('messaging_app') {
+                    sh '''
+cat <<EOF > .env
+MYSQL_DB=${MYSQL_DB}
+MYSQL_USER=${MYSQL_USER}
+MYSQL_PASSWORD=${MYSQL_PASSWORD}
+MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+EOF
+                    '''
+                }
+            }
+        }
+
+        stage('Build Services') {
+            steps {
+                dir('messaging_app') {
+                    sh 'docker compose build'
+                }
+            }
+        }
+
+        stage('Start Services') {
+            steps {
+                dir('messaging_app') {
+                    sh '''
+set -e
+docker compose up -d db
+for i in $(seq 1 10); do
+    if docker compose exec -T db mysqladmin ping -h localhost -u root -p${MYSQL_ROOT_PASSWORD} --silent; then
+        echo "MySQL is ready!"
+        exit 0
+    fi
+    echo "Waiting for MySQL... ($i/10)"
+    sleep 5
+done
+echo "MySQL did not become ready in time"
+exit 1
+                    '''
+                }
+            }
+        }
+
+        stage('Run Pytest in container') {
+            steps {
+                dir('messaging_app') {
+                    sh '''
+set -e
+mkdir -p reports
+# Ensure reports directory is writable by the container's non-root user
+chmod -R 777 reports || true
+# Install test deps and run tests within the SAME ephemeral container.
+# Use `python -m pytest` so PATH isn't required for the pytest script, and install with --user
+# to avoid permission issues when running as a non-root user inside the container.
+docker compose run --rm -w /app \
+    --user 0:0 \
+  -v "$PWD/reports:/app/reports" \
+  web sh -lc "python -m pip install --user -q pytest pytest-django pytest-cov \
+  && python manage.py migrate --noinput \
+    && umask 000 \
+    && python -m pytest -q --maxfail=1 --disable-warnings \
+       --junitxml=reports/pytest-report.xml \
+             --cov=. --cov-report=xml:reports/coverage.xml \
+    && chmod -R a+rw reports || true"
+                    '''
+                }
+            }
+        }
+
+        stage('Build Application Image') {
+            steps {
+                dir('messaging_app') {
+                    sh 'docker build -t ${IMAGE_NAME} .'
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            // Publish test results and coverage even on failures
+            junit allowEmptyResults: true, testResults: 'messaging_app/reports/pytest-report.xml'
+            archiveArtifacts artifacts: 'messaging_app/reports/**', allowEmptyArchive: true
+            dir('messaging_app') {
+                sh 'docker compose down -v || true'
+                sh 'rm -f .env'
+            }
+            echo 'Pipeline finished!'
+        }
+        success {
+            echo 'Pipeline succeeded!'
+        }
+        failure {
+            echo 'Build failed. Check logs for details.'
+        }
+    }
+}

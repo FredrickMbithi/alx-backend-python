@@ -1,0 +1,17 @@
+.env
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+
+# Django/SQLite local database
+db.sqlite3
+*.sqlite3
+
+# OS/editor files
+.DS_Store
+.idea/
+.vscode/
+
+# Virtual environments
+venv/
+.venv/

@@ -1,0 +1,9 @@
+# commands.txt - Task 3 command history
+# Enable NGINX Ingress controller (once per cluster)
+minikube addons enable ingress
+
+# Apply the ingress resource
+kubectl apply -f ingress.yaml
+
+# Verify ingress status
+kubectl get ingress

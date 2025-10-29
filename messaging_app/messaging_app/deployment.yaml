@@ -1,0 +1,70 @@
+# deployment.yaml - Base deployment for the Django messaging app (Task 1)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: messaging-app-deployment
+  labels:
+    app: messaging-app
+    tier: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: messaging-app
+      tier: web
+  template:
+    metadata:
+      labels:
+        app: messaging-app
+        tier: web
+    spec:
+      containers:
+        - name: messaging-app
+          image: messaging-app:1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DJANGO_SETTINGS_MODULE
+              value: messaging_app.settings
+            - name: DATABASE_HOST
+              value: mysql-service
+            - name: DATABASE_PORT
+              value: "3306"
+            - name: DATABASE_NAME
+              value: messaging_db
+            - name: DATABASE_USER
+              value: messaging_user
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: messaging-db-secret
+                  key: mysql-password
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: messaging-app-service
+  labels:
+    app: messaging-app
+    tier: web
+spec:
+  selector:
+    app: messaging-app
+    tier: web
+  ports:
+    - port: 8000
+      targetPort: 8000
+  type: ClusterIP

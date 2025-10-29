@@ -1,0 +1,46 @@
+#!/bin/bash
+# kubctl-0x01 - Task 2 helper script
+# Scales the messaging app deployment, verifies pod count, runs wrk, and checks resource usage.
+# Requirements: kubectl, minikube, wrk, and the Kubernetes Metrics Server (for kubectl top).
+
+set -euo pipefail
+
+info() {
+  printf '[INFO] %s\n' "$1"
+}
+
+error_exit() {
+  printf '[ERROR] %s\n' "$1" >&2
+  exit 1
+}
+
+DEPLOYMENT_NAME="messaging-app-deployment"
+TARGET_REPLICAS=3
+SERVICE_NAME="messaging-app-service"
+
+info "Scaling ${DEPLOYMENT_NAME} to ${TARGET_REPLICAS} replicas"
+kubectl scale deployment "${DEPLOYMENT_NAME}" --replicas="${TARGET_REPLICAS}"
+
+info "Waiting for pods to reach the Running state"
+kubectl wait --for=condition=Available deployment/"${DEPLOYMENT_NAME}" --timeout=120s
+
+info "Listing pods"
+kubectl get pods -l app=messaging-app -o wide
+
+info "Preparing load test with wrk"
+if ! command -v wrk >/dev/null 2>&1; then
+  error_exit "wrk is not installed. Install it from https://github.com/wg/wrk"
+fi
+
+SERVICE_URL=$(minikube service "${SERVICE_NAME}" --url)
+info "Running wrk against ${SERVICE_URL}"
+wrk -t2 -c20 -d15s "${SERVICE_URL}" || info "wrk exited with non-zero status; verify service availability"
+
+info "Displaying resource usage (kubectl top pods)"
+if kubectl top pods >/dev/null 2>&1; then
+  kubectl top pods -l app=messaging-app
+else
+  info "Metrics Server is not installed; skipping kubectl top. Install it via 'minikube addons enable metrics-server'."
+fi
+
+info "Task 2 workflow completed"

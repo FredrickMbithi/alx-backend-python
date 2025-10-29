@@ -1,0 +1,17 @@
+# kubeservice.yaml - Shared service for blue/green deployments (Task 4)
+apiVersion: v1
+kind: Service
+metadata:
+  name: messaging-app-router
+  labels:
+    app: messaging-app
+    tier: web
+spec:
+  selector:
+    app: messaging-app
+    tier: web
+    color: blue
+  ports:
+    - port: 8000
+      targetPort: 8000
+  type: ClusterIP

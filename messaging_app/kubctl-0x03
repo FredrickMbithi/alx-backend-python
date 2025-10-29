@@ -1,0 +1,31 @@
+#!/bin/bash
+# kubctl-0x03 - Task 5 helper script for rolling updates
+# Applies updated blue_deployment.yaml (image version 2.0), triggers rollout, and monitors status.
+
+set -euo pipefail
+
+info() { printf '[INFO] %s\n' "$1"; }
+
+info "Applying blue deployment (updated image tag 2.0)"
+kubectl apply -f blue_deployment.yaml
+
+info "Waiting for rollout to complete"
+kubectl rollout status deployment/messaging-app-blue --timeout=120s
+
+info "Testing service availability with continuous curl in background"
+SERVICE_URL=$(minikube service messaging-app-service --url)
+
+# Run a background loop of curl to ensure no downtime during rollout
+( while true; do curl -s -o /dev/null -w "%{http_code}\n" "${SERVICE_URL}"; sleep 1; done ) &
+CURL_PID=$!
+
+info "Sleeping 10s during rollout observation"
+sleep 10
+
+info "Stopping background curl"
+kill ${CURL_PID} || true
+
+info "Listing pods after rollout"
+kubectl get pods -l app=messaging-app -o wide
+
+info "Rolling update script completed"

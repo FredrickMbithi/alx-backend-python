@@ -1,0 +1,42 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Pytest
+.pytest_cache/
+
+# VSCode
+.vscode/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# Docker
+docker-compose.override.yml
+
+# Databases
+db.sqlite3
+*.sqlite3
+
+# Environment files
+.env
+.env.*
+
+# Django specific
+staticfiles/
+media/
+migrations/**/__pycache__/

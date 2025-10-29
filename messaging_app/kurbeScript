@@ -1,0 +1,37 @@
+#!/bin/bash
+# kurbeScript - helper for ALX Kubernetes task 0
+# This script starts a local Minikube cluster, verifies it, and lists pods.
+# It assumes Docker is installed and the current user has permission to access the Docker socket.
+
+set -euo pipefail
+
+# Utility function for consistent messaging
+info() {
+  printf '[INFO] %s\n' "$1"
+}
+
+error_exit() {
+  printf '[ERROR] %s\n' "$1" >&2
+  exit 1
+}
+
+# Ensure minikube is installed
+if ! command -v minikube >/dev/null 2>&1; then
+  error_exit "Minikube is not installed. Please install it from https://minikube.sigs.k8s.io/docs/start/"
+fi
+
+# Ensure kubectl is installed
+if ! command -v kubectl >/dev/null 2>&1; then
+  error_exit "kubectl is not installed. Please install it from https://kubernetes.io/docs/tasks/tools/"
+fi
+
+info "Starting (or resuming) the Minikube cluster using the Docker driver"
+minikube start --driver=docker
+
+info "Verifying cluster information"
+kubectl cluster-info
+
+info "Listing pods across all namespaces"
+kubectl get pods --all-namespaces
+
+info "Script completed successfully"

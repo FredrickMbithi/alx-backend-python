@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: django-messaging-service-blue
+  labels:
+    app: django-messaging-app
+    version: blue
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
+  selector:
+    app: django-messaging-app
+    version: blue
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: django-messaging-service-green
+  labels:
+    app: django-messaging-app
+    version: green
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
+  selector:
+    app: django-messaging-app
+    version: green
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: django-messaging-service-main
+  labels:
+    app: django-messaging-app
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
+  selector:
+    app: django-messaging-app
+    version: blue # Initially points to blue

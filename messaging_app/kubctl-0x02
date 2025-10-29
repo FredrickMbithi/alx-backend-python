@@ -1,0 +1,34 @@
+#!/bin/bash
+# kubctl-0x02 - Task 4 helper script for blue/green deployments
+# Applies blue and green deployments, updates the service, and inspects logs.
+
+set -euo pipefail
+
+info() {
+  printf '[INFO] %s\n' "$1"
+}
+
+info "Applying blue deployment"
+kubectl apply -f blue_deployment.yaml
+
+info "Applying green deployment"
+kubectl apply -f green_deployment.yaml
+
+info "Applying routing service"
+kubectl apply -f kubeservice.yaml
+
+info "Current deployments"
+kubectl get deployments -l app=messaging-app
+
+info "Current pods"
+kubectl get pods -l app=messaging-app -o wide
+
+info "Tailing latest logs from the green deployment"
+GREEN_POD=$(kubectl get pods -l app=messaging-app,color=green -o jsonpath='{.items[0].metadata.name}')
+kubectl logs "$GREEN_POD" --tail=50
+
+info "Tailing latest logs from the blue deployment"
+BLUE_POD=$(kubectl get pods -l app=messaging-app,color=blue -o jsonpath='{.items[0].metadata.name}')
+kubectl logs "$BLUE_POD" --tail=50
+
+info "Blue/Green deployment check finished"

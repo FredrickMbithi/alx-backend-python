@@ -1,0 +1,53 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: messaging_db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MYSQL_DATABASE: "${MYSQL_DB}"
+      MYSQL_USER: "${MYSQL_USER}"
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
+      MYSQL_DB: "${MYSQL_DB}"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3307:3306"  # Changed to 3307 to avoid port conflict
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: messaging_web
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: sh -c "python manage.py migrate --noinput && python manage.py test && python manage.py runserver 0.0.0.0:8000"
+
+    # For CI reliability, avoid bind-mounting source into the container to prevent masking
+    # the application files copied during the image build (ensures manage.py and package exist).
+    # volumes:
+    #   - .:/app
+
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_HOST: db
+      DATABASE_PORT: 3306
+      DATABASE_NAME: "${MYSQL_DB}"
+      DATABASE_USER: "${MYSQL_USER}"
+      DATABASE_PASSWORD: "${MYSQL_PASSWORD}"
+      PYTHONPATH: "/app"
+
+volumes:
+  mysql_data:

@@ -1,0 +1,12 @@
+asgiref==3.10.0
+Django==5.2.7
+mysqlclient==2.2.7
+sqlparse==0.5.3
+python-dotenv==1.0.1
+djangorestframework==3.14.0
+djangorestframework-simplejwt
+django-filter
+drf-nested-routers
+parameterized==0.9.0
+pytest
+pytest-django

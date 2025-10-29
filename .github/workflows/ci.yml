@@ -1,0 +1,180 @@
+name: Django CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpassword123
+          MYSQL_DATABASE: messaging_db
+          MYSQL_USER: messaging_user
+          MYSQL_PASSWORD: changeme123
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -prootpassword123"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      DATABASE_HOST: 127.0.0.1
+      DATABASE_PORT: 3306
+      DATABASE_NAME: messaging_db
+      DATABASE_USER: messaging_user
+      DATABASE_PASSWORD: changeme123
+      DJANGO_SETTINGS_MODULE: messaging_app.settings
+      PYTHONPATH: "${{ github.workspace }}/messaging_app"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        working-directory: messaging_app
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-django pytest-cov coverage
+
+      - name: Wait for MySQL to be ready
+        run: |
+          for i in {1..10}; do
+            if mysqladmin ping -h 127.0.0.1 -uroot -prootpassword123 --silent; then
+              echo "MySQL is ready!"
+              exit 0
+            fi
+            echo "Waiting for MySQL ($i/10)..."
+            sleep 5
+          done
+          echo "MySQL not ready in time" && exit 1
+
+      - name: Grant test database privileges
+        run: |
+          mysql -h 127.0.0.1 -uroot -prootpassword123 <<SQL
+          GRANT ALL PRIVILEGES ON *.* TO 'messaging_user'@'%';
+          FLUSH PRIVILEGES;
+          SQL
+
+      - name: Run migrations
+        working-directory: messaging_app
+        run: python manage.py migrate --noinput
+
+      - name: Run tests with pytest
+        working-directory: messaging_app
+        run: |
+          pytest chats/ \
+            --verbose \
+            --junitxml=test-results.xml \
+            --cov=chats \
+            --cov-report=xml:coverage.xml \
+            --cov-report=html:htmlcov \
+            --cov-report=term
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-python-${{ matrix.python-version }}
+          path: messaging_app/test-results.xml
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-python-${{ matrix.python-version }}
+          path: |
+            messaging_app/coverage.xml
+            messaging_app/htmlcov/
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install linting tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 black isort pylint
+
+      - name: Run flake8
+        working-directory: messaging_app
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=*/migrations/*,messaging_app/settings.py
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics --exclude=*/migrations/*
+
+      - name: Check code formatting with black
+        working-directory: messaging_app
+        run: black --check --diff .
+        continue-on-error: true
+
+      - name: Check import sorting with isort
+        working-directory: messaging_app
+        run: isort --check-only --diff .
+        continue-on-error: true
+
+      - name: Run pylint
+        working-directory: messaging_app
+        run: pylint chats/ --exit-zero
+        continue-on-error: true
+
+  security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install security tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install safety bandit
+
+      - name: Check dependencies for vulnerabilities
+        working-directory: messaging_app
+        run: safety check --file=requirements.txt --output=text
+        continue-on-error: true
+
+      - name: Run bandit security scan
+        working-directory: messaging_app
+        run: |
+          bandit -r . -f json -o bandit-report.json || true
+          bandit -r . -f screen
+        continue-on-error: true
+
+      - name: Upload security report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: messaging_app/bandit-report.json
